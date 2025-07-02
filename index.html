@@ -2,8 +2,7 @@
 <html lang="uk">
   <head>
     <meta charset="UTF-8">
-    <title>Місто для учнів (A-Frame)</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Віртуальна прогулянка по місту</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <style>
       body { margin: 0; }
@@ -34,23 +33,23 @@
       <span style="margin-left:25px;font-size:0.9em;color:#ccc;">WASD — рух, Shift — біг</span>
     </div>
 
-    <a-scene
-      background="color: #22232a"
+    <a-scene background="color: #22232a"
       loading-screen="dotsColor: #45b5c4; backgroundColor: #22232a"
       shadow="type: pcfsoft"
       vr-mode-ui="enabled: false"
       keyboard-shortcuts="enterVR: false"
-      embedded
-    >
-      <!-- Місто -->
-      <a-assets>
+      embedded>
+      <a-assets timeout="12000">
+        <!-- Шлях строго відносно index.html! -->
         <a-asset-item id="cityModel" src="city/source/city.glb"></a-asset-item>
       </a-assets>
+
+      <!-- Місто -->
       <a-entity gltf-model="#cityModel" position="0 0 0" shadow="cast: true; receive: true"></a-entity>
 
-      <!-- Освітлення -->
-      <a-entity light="type: ambient; color: #eef; intensity: 0.75"></a-entity>
-      <a-entity light="type: directional; intensity: 1.5" position="30 70 40"></a-entity>
+      <!-- Світло -->
+      <a-entity light="type: ambient; color: #eef; intensity: 0.9"></a-entity>
+      <a-entity light="type: directional; intensity: 2.2" position="50 80 40"></a-entity>
 
       <!-- Камера+контрол -->
       <a-entity
@@ -63,12 +62,11 @@
     </a-scene>
 
     <script>
-      // Налаштування швидкості бігу та перемикання кнопок
-      const speeds = {1: 40, 2: 80, 4: 160}; // acceleration у wasd-controls
+      // Швидкість руху
+      const speeds = {1: 40, 2: 80, 4: 160};
       let currentSpeed = 1;
       let running = false;
       const player = document.getElementById('player');
-      const wasd = player.components['wasd-controls'];
       const buttons = document.querySelectorAll('#speed-panel button');
 
       // Перемикач швидкості
@@ -99,7 +97,7 @@
         }
       });
 
-      // Щоб при завантаженні була стандартна швидкість
+      // Встановити стандартну швидкість при старті
       window.addEventListener('DOMContentLoaded', () => {
         player.setAttribute('wasd-controls', 'acceleration', speeds[currentSpeed]);
       });
