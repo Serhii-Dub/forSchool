@@ -2,49 +2,19 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>3D місто для учнів</title>
+  <title>Тест завантаження GLB</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #move-panel {
-      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100;
-      background: rgba(30,30,30,0.87); padding: 10px 16px; border-radius: 13px;
-      font-size: 1.08em; color: #fff; font-family: Segoe UI,Arial,sans-serif;
-      user-select: none; box-shadow: 0 2px 8px #0006;
-      display: flex; gap: 10px;
-    }
-    #move-panel button {
-      font-size: 1.07em; border-radius: 8px; border: none;
-      background: #45b5c4; color: #fff; padding: 3px 16px; cursor: pointer;
-      transition: background 0.2s;
-    }
-    #move-panel button.active {
-      background: #ffab00;
-      color: #222;
-      font-weight: bold;
-    }
-  </style>
+  <style>body { margin: 0; }</style>
 </head>
 <body>
-  <div id="move-panel">
-    <button onclick="moveTo(0, 3, 8)">Старт</button>
-    <button onclick="moveTo(30, 5, 25)">До площі</button>
-    <button onclick="moveTo(-20, 5, 0)">У парк</button>
-    <button onclick="moveTo(0, 3, -30)">В центр</button>
-  </div>
-  <a-scene background="color: #23252a" shadow="type: pcfsoft" embedded>
-    <a-assets timeout="30000">
-      <a-asset-item id="cityModel" src="city/source/city.glb"></a-asset-item>
+  <a-scene background="color: #222">
+    <a-assets>
+      <a-asset-item id="cityModel" src="model/city.glb"></a-asset-item>
     </a-assets>
     <a-entity gltf-model="#cityModel" position="0 0 0"></a-entity>
-    <a-entity light="type: ambient; color: #eef; intensity: 1"></a-entity>
-    <a-entity light="type: directional; intensity: 2.2" position="50 80 40"></a-entity>
-    <a-entity id="player" camera wasd-controls position="0 3 8" look-controls="pointerLockEnabled: true"></a-entity>
+    <a-entity camera wasd-controls look-controls position="0 3 8"></a-entity>
+    <a-entity light="type: ambient; color: #eef; intensity: 1.2"></a-entity>
+    <a-entity light="type: directional; intensity: 2" position="50 80 40"></a-entity>
   </a-scene>
-  <script>
-    function moveTo(x, y, z) {
-      document.getElementById('player').setAttribute('position', `${x} ${y} ${z}`);
-    }
-  </script>
 </body>
 </html>
