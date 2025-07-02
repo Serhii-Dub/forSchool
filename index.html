@@ -1,18 +1,108 @@
 <!DOCTYPE html>
 <html lang="uk">
-<head>
-  <meta charset="UTF-8">
-  <title>Віртуальна прогулянка</title>
-  <style>html,body{height:100%;margin:0;overflow:hidden;}</style>
-</head>
-<body>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
-  <script>
-    console.log("PointerLockControls = ", THREE.PointerLockControls);
-    let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    let controls = new THREE.PointerLockControls(camera, document.body);
-    // Має не падати!
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <title>Місто для учнів (A-Frame)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <style>
+      body { margin: 0; }
+      #speed-panel {
+        position: absolute; top: 18px; right: 24px; z-index: 100;
+        background: rgba(30,30,30,0.87); padding: 14px 20px; border-radius: 15px;
+        font-size: 1.15em; color: #fff; font-family: Segoe UI,Arial,sans-serif;
+        user-select: none; box-shadow: 0 2px 8px #0006;
+      }
+      #speed-panel button {
+        font-size: 1.15em; margin: 0 2px; border-radius: 7px; border: none;
+        background: #45b5c4; color: #fff; padding: 3px 18px; cursor: pointer;
+        transition: background 0.2s;
+      }
+      #speed-panel button.active {
+        background: #ffab00;
+        color: #222;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="speed-panel">
+      <b>Швидкість:</b>
+      <button data-speed="1" class="active">x1</button>
+      <button data-speed="2">x2</button>
+      <button data-speed="4">x4</button>
+      <span style="margin-left:25px;font-size:0.9em;color:#ccc;">WASD — рух, Shift — біг</span>
+    </div>
+
+    <a-scene
+      background="color: #22232a"
+      loading-screen="dotsColor: #45b5c4; backgroundColor: #22232a"
+      shadow="type: pcfsoft"
+      vr-mode-ui="enabled: false"
+      keyboard-shortcuts="enterVR: false"
+      embedded
+    >
+      <!-- Місто -->
+      <a-assets>
+        <a-asset-item id="cityModel" src="city/source/city.glb"></a-asset-item>
+      </a-assets>
+      <a-entity gltf-model="#cityModel" position="0 0 0" shadow="cast: true; receive: true"></a-entity>
+
+      <!-- Освітлення -->
+      <a-entity light="type: ambient; color: #eef; intensity: 0.75"></a-entity>
+      <a-entity light="type: directional; intensity: 1.5" position="30 70 40"></a-entity>
+
+      <!-- Камера+контрол -->
+      <a-entity
+        id="player"
+        camera
+        wasd-controls="acceleration: 40"
+        position="0 3 8"
+        look-controls="pointerLockEnabled: true"
+      ></a-entity>
+    </a-scene>
+
+    <script>
+      // Налаштування швидкості бігу та перемикання кнопок
+      const speeds = {1: 40, 2: 80, 4: 160}; // acceleration у wasd-controls
+      let currentSpeed = 1;
+      let running = false;
+      const player = document.getElementById('player');
+      const wasd = player.components['wasd-controls'];
+      const buttons = document.querySelectorAll('#speed-panel button');
+
+      // Перемикач швидкості
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          buttons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSpeed = Number(btn.dataset.speed);
+          setTimeout(() => {
+            player.setAttribute('wasd-controls', 'acceleration', speeds[currentSpeed] * (running ? 2 : 1));
+          }, 30);
+        });
+      });
+
+      // Shift — біг (x2)
+      window.addEventListener('keydown', e => {
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+          if (!running) {
+            running = true;
+            player.setAttribute('wasd-controls', 'acceleration', speeds[currentSpeed]*2);
+          }
+        }
+      });
+      window.addEventListener('keyup', e => {
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+          running = false;
+          player.setAttribute('wasd-controls', 'acceleration', speeds[currentSpeed]);
+        }
+      });
+
+      // Щоб при завантаженні була стандартна швидкість
+      window.addEventListener('DOMContentLoaded', () => {
+        player.setAttribute('wasd-controls', 'acceleration', speeds[currentSpeed]);
+      });
+    </script>
+  </body>
 </html>
