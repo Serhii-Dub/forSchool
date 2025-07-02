@@ -2,19 +2,140 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>Тест завантаження GLB</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <style>body { margin: 0; }</style>
+  <title>Меню 3D моделей</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(120deg,#222941 50%, #3289c6 100%);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      text-align: center;
+      margin-top: 35px;
+      margin-bottom: 32px;
+    }
+    h1 {
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #fff;
+      margin-bottom: 10px;
+      text-shadow: 0 3px 18px #0015;
+    }
+    h2 {
+      color: #ffab00;
+      font-size: 1.2em;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .models {
+      display: flex;
+      gap: 38px;
+      justify-content: center;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .model-card {
+      background: rgba(0,0,0,0.26);
+      border-radius: 22px;
+      box-shadow: 0 4px 26px #0003;
+      padding: 22px 30px 18px 30px;
+      min-width: 260px;
+      max-width: 320px;
+      transition: transform 0.18s, box-shadow 0.22s;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .model-card:hover {
+      transform: translateY(-8px) scale(1.028);
+      box-shadow: 0 12px 40px #0073a336;
+      background: rgba(34,41,65,0.97);
+    }
+    .model-title {
+      font-size: 1.34em;
+      color: #3fdef8;
+      font-weight: 700;
+      margin-bottom: 13px;
+      letter-spacing: 0.03em;
+    }
+    .model-desc {
+      color: #e5e5e5;
+      font-size: 1.05em;
+      margin-bottom: 18px;
+      min-height: 48px;
+      line-height: 1.42;
+    }
+    .model-btn {
+      background: linear-gradient(90deg,#3289c6 60%,#ffab00 100%);
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.13em;
+      border: none;
+      padding: 8px 32px;
+      border-radius: 13px;
+      cursor: pointer;
+      box-shadow: 0 1px 6px #0003;
+      transition: background 0.15s, color 0.12s, box-shadow 0.18s;
+    }
+    .model-btn:hover {
+      background: linear-gradient(90deg,#25608c 40%,#f7b900 100%);
+      color: #1a222b;
+      box-shadow: 0 3px 22px #ffb20055;
+    }
+    .desc {
+      max-width: 820px;
+      margin: 0 auto 38px auto;
+      background: rgba(34,41,65,0.54);
+      border-radius: 16px;
+      padding: 20px 24px;
+      font-size: 1.09em;
+      box-shadow: 0 4px 22px #0001;
+      line-height: 1.7;
+    }
+    @media (max-width: 800px) {
+      .models { flex-direction: column; gap: 26px; }
+      .desc { font-size: 1em; padding: 18px 7px; }
+    }
+  </style>
 </head>
 <body>
-  <a-scene background="color: #222">
-    <a-assets>
-      <a-asset-item id="cityModel" src="model/city.glb"></a-asset-item>
-    </a-assets>
-    <a-entity gltf-model="#cityModel" position="0 0 0"></a-entity>
-    <a-entity camera wasd-controls look-controls position="0 3 8"></a-entity>
-    <a-entity light="type: ambient; color: #eef; intensity: 1.2"></a-entity>
-    <a-entity light="type: directional; intensity: 2" position="50 80 40"></a-entity>
-  </a-scene>
+  <header>
+    <h1>Меню 3D Моделей</h1>
+    <h2>Освітній проєкт для учнів | A-Frame Web Demo</h2>
+  </header>
+
+  <div class="desc">
+    <b>A-Frame</b> — це фреймворк для створення 3D-сцен прямо у браузері (на основі Three.js). Він дозволяє візуалізувати моделі та створювати інтерактивні віртуальні простори без складної установки. На цій сторінці ви можете подивитись, як підвантажуються різні міста.<br><br>
+    <b>Як це працює?</b> Ви переходите до демо, і через декілька секунд завантажується місто. Ви можете ходити клавішами <b>WASD</b> або переміщатись за допомогою спеціальних кнопок.<br><br>
+    <b>Код дуже простий:</b> підключається бібліотека <code>aframe.min.js</code>, далі вказується шлях до моделі через <code>&lt;a-asset-item&gt;</code>, а модель додається в сцену через <code>&lt;a-entity gltf-model=\"...\"&gt;</code>.
+  </div>
+
+  <div class="models">
+    <div class="model-card">
+      <div class="model-title">Модель міста 1</div>
+      <div class="model-desc">
+        GLB-модель з текстурами 1k, усі матеріали вже вбудовані. Мінімальне демо на A-Frame.<br>
+        <b>Шлях:</b> <code>model/city1.glb</code>
+      </div>
+      <a href="index1.html"><button class="model-btn">Перейти до моделі 1</button></a>
+    </div>
+    <div class="model-card">
+      <div class="model-title">Модель міста 2</div>
+      <div class="model-desc">
+        Альтернативна міська модель. Також вбудовані всі матеріали.<br>
+        <b>Шлях:</b> <code>model/city2.glb</code>
+      </div>
+      <a href="index2.html"><button class="model-btn">Перейти до моделі 2</button></a>
+    </div>
+  </div>
 </body>
 </html>
