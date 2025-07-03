@@ -2,84 +2,132 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
-  <title>VR Car Demo</title>
+  <title>AR Car Demo</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    #info {
-      position: absolute; top: 10px; left: 10px;
-      padding: 5px 10px; background: rgba(0,0,0,0.5);
-      color: #fff; font-family: sans-serif;
+    #message {
+      position: absolute;
+      top: 10px; left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      font-family: sans-serif;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <div id="info">Натисніть Enter VR, щоб увійти в режим віртуальної реальності</div>
+  <div id="message">Натисніть “Enter AR” і наведіть камеру на підлогу</div>
 
   <script type="module">
     import * as THREE from 'three';
-    import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+    import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
     let camera, scene, renderer;
+    let reticle, hitTestSource = null, hitTestSourceRequested = false;
+    let carModel;
 
     init();
-    animate();
+    renderer.setAnimationLoop(render);
 
     function init() {
-      // Сцена й камера
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+      scene  = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
       camera.position.set(0, 1.6, 0);
 
-      // Рендерер з WebXR
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      // Рендерер з прозорим фоном і WebXR
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
-      document.body.appendChild(VRButton.createButton(renderer));
 
-      // Освітлення
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+      // Кнопка входу в AR
+      document.body.appendChild(
+        ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] })
+      );
+
+      // Світло
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
       light.position.set(0, 1, 0);
       scene.add(light);
 
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      dirLight.position.set(5, 10, 7.5);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      dirLight.position.set(0, 5, 5);
       scene.add(dirLight);
 
-      // Земна площина для орієнтації
-      const grid = new THREE.GridHelper(10, 10, 0x888888, 0x444444);
-      scene.add(grid);
+      // Ретикул (тільки для візуалізації місця підстановки)
+      const ringGeo = new THREE.RingGeometry(0.1, 0.11, 32).rotateX(- Math.PI/2);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      reticle = new THREE.Mesh(ringGeo, ringMat);
+      reticle.matrixAutoUpdate = false;
+      reticle.visible = false;
+      scene.add(reticle);
 
-      // Завантаження моделі автомобіля
-      const loader = new GLTFLoader();
-      loader.load(
-        'car/car2.glb',
+      // Завантажуємо GLB-модель, але ще не додаємо в сцену
+      new GLTFLoader().load('car/car2.glb',
         gltf => {
-          const car = gltf.scene;
-          car.position.set(0, 0, -2);   // 2 метри перед стартовою точкою
-          car.scale.set(0.5, 0.5, 0.5); // при потребі змініть масштаб
-          scene.add(car);
+          carModel = gltf.scene;
+          carModel.scale.set(0.5, 0.5, 0.5);
         },
         undefined,
-        err => console.error('Помилка завантаження моделі:', err)
+        err => console.error('GLTF load error:', err)
       );
 
       window.addEventListener('resize', onWindowResize);
     }
 
     function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    function animate() {
-      renderer.setAnimationLoop(render);
-    }
+    function render(timestamp, frame) {
+      if (frame) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const session        = renderer.xr.getSession();
 
-    function render() {
+        // 1) Запит джерела хит-тесту лише одного разу
+        if (!hitTestSourceRequested) {
+          session.requestReferenceSpace('viewer').then(viewerSpace => {
+            session.requestHitTestSource({ space: viewerSpace }).then(source => {
+              hitTestSource = source;
+            });
+          });
+          session.addEventListener('end', () => {
+            hitTestSourceRequested = false;
+            hitTestSource = null;
+          });
+          hitTestSourceRequested = true;
+        }
+
+        // 2) Виконуємо хит-тест і відображаємо ретикул
+        if (hitTestSource) {
+          const results = frame.getHitTestResults(hitTestSource);
+          if (results.length) {
+            const hit = results[0];
+            const pose = hit.getPose(referenceSpace);
+
+            reticle.visible = true;
+            reticle.matrix.fromArray(pose.transform.matrix);
+
+            // 3) Разова підстановка моделі саме в точку ретикулу
+            if (carModel && !carModel.parent) {
+              carModel.position.setFromMatrixPosition(reticle.matrix);
+              carModel.quaternion.setFromRotationMatrix(reticle.matrix);
+              scene.add(carModel);
+              document.getElementById('message').style.display = 'none';
+            }
+          } else {
+            reticle.visible = false;
+          }
+        }
+      }
+
       renderer.render(scene, camera);
     }
   </script>
