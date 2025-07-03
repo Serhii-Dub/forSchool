@@ -42,13 +42,15 @@
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
 
+      // ВАЖЛИВО: не передавай аргументів у createButton()
+      // ARButton сам вибере AR/VR чи nothing
       document.body.appendChild(ARButton.createButton(renderer));
 
       // Світло
       scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
       scene.add(new THREE.DirectionalLight(0xffffff, 0.7).position.set(0, 10, 10));
 
-      // Додаємо машини ОДРАЗУ при старті AR-сесії
+      // Додаємо машини при старті AR-сесії
       renderer.xr.addEventListener('sessionstart', () => {
         if (carsAdded) return;
         carsAdded = true;
@@ -59,7 +61,7 @@
         loader.load('car/car1.glb', (gltf1) => {
           const car1 = gltf1.scene;
           car1.position.set(-0.4, -0.5, -1.0); // X: зліва, Y: на підлогу, Z: вперед
-          car1.scale.set(0.32, 0.32, 0.32); // Підібрай масштаб під свою модель!
+          car1.scale.set(0.32, 0.32, 0.32);
           scene.add(car1);
         }, undefined, () => {
           alert('Не вдалося завантажити car1.glb');
