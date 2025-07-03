@@ -7,43 +7,48 @@
         body { 
             margin: 0; 
             overflow: hidden; 
-            background-color: black; /* Додано для запобігання білому екрану */
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #arButton {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
     </style>
 </head>
 <body>
+    <button id="arButton">START AR</button>
+    
     <script type="module">
         import * as THREE from 'https://cdn.skypack.dev/three@0.136';
         import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
         import { ARButton } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/ARButton.js';
 
-        // 1. Ініціалізація сцени
+        // 1. Ініціалізація
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        camera.position.set(0, 1.6, 0); // Висота очей людини
-        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 20);
         const renderer = new THREE.WebGLRenderer({ 
             antialias: true, 
             alpha: true 
         });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true; // Увімкнути XR
+        renderer.xr.enabled = true;
         document.body.appendChild(renderer.domElement);
-        
-        // 2. Додавання кнопки AR
-        const arButton = ARButton.createButton(renderer, { 
-            requiredFeatures: ['hit-test'] 
-        });
-        document.body.appendChild(arButton);
 
-        // 3. Освітлення (обов'язкове для моделей)
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(0, 1, 0);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        // 2. Освітлення
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-        // 4. Завантаження моделі
+        // 3. Завантаження моделі
         let model;
         new GLTFLoader().load(
             'https://serhii-dub.github.io/forSchool/car/car2.glb',
@@ -52,12 +57,10 @@
                 model.scale.set(0.5, 0.5, 0.5);
                 model.visible = false;
                 scene.add(model);
-            },
-            undefined,
-            (error) => console.error('Помилка завантаження моделі:', error)
+            }
         );
 
-        // 5. Ретелк (індикатор поверхні)
+        // 4. Ретелк (індикатор поверхні)
         const reticle = new THREE.Mesh(
             new THREE.RingGeometry(0.05, 0.1, 32).rotateX(-Math.PI / 2),
             new THREE.MeshBasicMaterial({ color: 0xffffff })
@@ -66,43 +69,47 @@
         reticle.matrixAutoUpdate = false;
         scene.add(reticle);
 
-        // 6. Ініціалізація WebXR
-        let hitTestSource = null;
-        let refSpace = null;
-
-        function onSessionStart(session) {
-            session.addEventListener('end', onSessionEnd);
+        // 5. Фікс для кнопки
+        const arButton = document.getElementById('arButton');
+        arButton.addEventListener('click', async () => {
+            // Видаляємо стару кнопку
+            arButton.remove();
             
-            session.requestReferenceSpace('viewer').then((space) => {
-                refSpace = space;
-                return session.requestHitTestSource({ space: refSpace });
-            }).then((source) => {
-                hitTestSource = source;
+            // Створюємо кнопку через ARButton
+            const realArButton = ARButton.createButton(renderer, { 
+                requiredFeatures: ['hit-test'] 
             });
-        }
-
-        function onSessionEnd() {
-            hitTestSource = null;
-            refSpace = null;
-        }
-
-        renderer.xr.addEventListener('sessionstart', (event) => onSessionStart(event.session));
-
-        // 7. Головний цикл рендерингу
-        renderer.setAnimationLoop((timestamp, frame) => {
-            if (frame && hitTestSource && refSpace) {
-                const hitTestResults = frame.getHitTestResults(hitTestSource);
-                reticle.visible = hitTestResults.length > 0;
-                
-                if (reticle.visible) {
-                    const hit = hitTestResults[0];
-                    reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
-                }
-            }
-            renderer.render(scene, camera);
+            document.body.appendChild(realArButton);
+            
+            // Симулюємо клік для запуску AR
+            setTimeout(() => realArButton.click(), 300);
         });
 
-        // 8. Розміщення моделі при кліку
+        // 6. WebXR логіка
+        let hitTestSource = null;
+        
+        renderer.xr.addEventListener('sessionstart', async (session) => {
+            console.log("AR сесія запущена");
+            
+            const refSpace = await session.requestReferenceSpace('viewer');
+            hitTestSource = await session.requestHitTestSource({ space: refSpace });
+            
+            // Анімаційний цикл
+            renderer.setAnimationLoop((time, frame) => {
+                if (frame && hitTestSource) {
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+                    reticle.visible = hitTestResults.length > 0;
+                    
+                    if (reticle.visible) {
+                        const hit = hitTestResults[0];
+                        reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
+                    }
+                }
+                renderer.render(scene, camera);
+            });
+        });
+
+        // 7. Розміщення моделі
         const controller = renderer.xr.getController(0);
         controller.addEventListener('select', () => {
             if (reticle.visible && model) {
@@ -113,7 +120,7 @@
         });
         scene.add(controller);
 
-        // 9. Обробка розміру вікна
+        // 8. Обробка розміру вікна
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
