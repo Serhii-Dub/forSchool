@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>AR Робот - рух і колір</title>
+  <style>
+    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
+    #info {
+      position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
+      color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
+      text-shadow: 0 1px 8px #000c;
+      font-size: 1.14em;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    👋 <b>AR Робот</b>: <br>
+    - Свайп ліво/право: рухати робота <br>
+    - Тап по роботу: змінити колір <br>
+    (Жестове керування додам — якщо треба прямо розпізнавання рукою)
+  </div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
+
+    let camera, scene, renderer;
+    let robot;
+    let controller;
+    let robotColor = 0x1ec8e7;
+
+    let startX = null, dragging = false;
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      // AR Button
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+      // Робот з примітивів
+      robot = new THREE.Group();
+
+      // Тіло
+      let body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.3, 0.1),
+        new THREE.MeshPhongMaterial({ color: robotColor })
+      );
+      body.position.y = 0.15;
+      robot.add(body);
+
+      // Голова
+      let head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.12, 0.12),
+        new THREE.MeshPhongMaterial({ color: robotColor })
+      );
+      head.position.y = 0.34;
+      robot.add(head);
+
+      // Ноги
+      let leg1 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.18, 0.06),
+        new THREE.MeshPhongMaterial({ color: robotColor })
+      );
+      leg1.position.set(-0.06, 0.02, 0);
+      robot.add(leg1);
+      let leg2 = leg1.clone();
+      leg2.position.set(0.06, 0.02, 0);
+      robot.add(leg2);
+
+      // Руки
+      let arm1 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.16, 0.05),
+        new THREE.MeshPhongMaterial({ color: robotColor })
+      );
+      arm1.position.set(-0.15, 0.23, 0);
+      robot.add(arm1);
+      let arm2 = arm1.clone();
+      arm2.position.set(0.15, 0.23, 0);
+      robot.add(arm2);
+
+      robot.position.set(0, 0, -0.7);
+      scene.add(robot);
+
+      // Світло
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.4);
+      light.position.set(0, 1, 0);
+      scene.add(light);
+
+      // Свайп для руху робота
+      renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          startX = e.touches[0].clientX;
+          dragging = true;
+        }
+      });
+      renderer.domElement.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        let dx = e.touches[0].clientX - startX;
+        if (Math.abs(dx) > 30) {
+          robot.position.x += dx / 400;
+          startX = e.touches[0].clientX;
+        }
+      });
+      renderer.domElement.addEventListener('touchend', (e) => {
+        dragging = false;
+      });
+
+      // Тап по роботу для зміни кольору
+      renderer.domElement.addEventListener('click', (e) => {
+        robotColor = Math.random() * 0xffffff;
+        robot.traverse(child => {
+          if (child.isMesh) child.material.color.setHex(robotColor);
+        });
+      });
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
