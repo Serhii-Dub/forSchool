@@ -16,16 +16,16 @@
 </head>
 <body>
   <button id="ar-button">Увімкнути AR</button>
+  <!-- ОБОВ'ЯЗКОВО ТАКИЙ ПОРЯДОК -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/webxr/ARButton.js"></script>
   <script>
-    let camera, scene, renderer, controller, reticle, carModel;
+    let camera, scene, renderer, reticle, carModel;
     let selectedCar = 'car/car1.glb';
 
-    const arButton = document.getElementById('ar-button');
-    arButton.addEventListener('click', () => {
-      arButton.style.display = 'none';
+    document.getElementById('ar-button').addEventListener('click', () => {
+      document.getElementById('ar-button').style.display = 'none';
       startAR();
     });
 
@@ -39,9 +39,11 @@
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera();
 
+      // Light
       const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
       scene.add(light);
 
+      // Reticle
       reticle = new THREE.Mesh(
         new THREE.RingGeometry(0.11, 0.15, 32).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0x44ff44, opacity: 0.6, transparent: true })
@@ -50,14 +52,16 @@
       reticle.visible = false;
       scene.add(reticle);
 
+      // Завантаження моделі
       const loader = new THREE.GLTFLoader();
-      loader.load(selectedCar, gltf => {
+      loader.load(selectedCar, function (gltf) {
         carModel = gltf.scene;
         carModel.visible = false;
         carModel.scale.set(0.4, 0.4, 0.4);
         scene.add(carModel);
       });
 
+      // AR Button
       document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
       let hitTestSource = null;
@@ -69,8 +73,8 @@
           const session = renderer.xr.getSession();
 
           if (!hitTestSourceRequested) {
-            session.requestReferenceSpace('viewer').then((referenceSpace) => {
-              session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+            session.requestReferenceSpace('viewer').then(function (referenceSpace) {
+              session.requestHitTestSource({ space: referenceSpace }).then(function (source) {
                 hitTestSource = source;
               });
             });
@@ -95,7 +99,7 @@
         renderer.render(scene, camera);
       });
 
-      renderer.domElement.addEventListener('click', (event) => {
+      renderer.domElement.addEventListener('click', function () {
         if (reticle.visible && carModel && !carModel.visible) {
           carModel.position.setFromMatrixPosition(reticle.matrix);
           carModel.quaternion.setFromRotationMatrix(reticle.matrix);
