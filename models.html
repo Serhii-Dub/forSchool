@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Дві моделі зліва та справа — Three.js + GLTF</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#222244; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.min.js"></script>
+</head>
+<body>
+  <script>
+    // Сцена та камера
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222244);
+
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth / window.innerHeight, 0.1, 100
+    );
+    camera.position.set(0, 1.5, 5);
+
+    // Рендерер
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Додаємо OrbitControls для керування камерою мишкою
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1, 0); // фокус на центр
+    controls.update();
+
+    // Освітлення
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    dirLight.position.set(3, 10, 10);
+    scene.add(dirLight);
+
+    // (Опціонально) Додаємо осі координат
+    const axesHelper = new THREE.AxesHelper(2);
+    scene.add(axesHelper);
+
+    // GLTF Loader
+    const loader = new THREE.GLTFLoader();
+
+    // Ліва модель (model.glb)
+    loader.load('models/model.glb', function(gltf) {
+      const modelLeft = gltf.scene;
+      modelLeft.position.set(-3.5, 0, 0); // ліворуч
+      modelLeft.scale.set(0.5, 0.5, 0.5); // зменшуємо модель, якщо треба ще менше — став 0.2
+      scene.add(modelLeft);
+    }, undefined, function(e) {
+      console.error('Не вдалося завантажити model.glb', e);
+    });
+
+    // Права модель (model2.glb)
+    loader.load('models/model2.glb', function(gltf) {
+      const modelRight = gltf.scene;
+      modelRight.position.set(-0.5, 0, -27); // праворуч і трохи вперед
+      modelRight.scale.set(0.5, 0.5, 0.5);
+      scene.add(modelRight);
+    }, undefined, function(e) {
+      console.error('Не вдалося завантажити model2.glb', e);
+    });
+
+    // Анімація
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Ресайз
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
