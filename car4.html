@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>AR Автомобіль — Інформатика</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    let camera, scene, renderer;
+    let car4;
+
+    function startAR() {
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      // Світло
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x222233, 2.5));
+
+      // AR-кнопка (залишається!)
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
+
+      // Додаємо МОДЕЛЬ car4.glb тільки після старту XR-сесії!
+      renderer.xr.addEventListener('sessionstart', () => {
+        const loader = new GLTFLoader();
+
+        loader.load('car/car4.glb', gltf => {
+          car4 = gltf.scene;
+          car4.scale.set(1, 1, 1);
+          car4.position.set(-2.5, -10, -1.2);  // 1.2 м попереду
+          scene.add(car4);
+        });
+      });
+
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+
+    startAR();
+  </script>
+</body>
+</html>
