@@ -7,14 +7,21 @@
   <style>
     body { margin: 0; overflow: hidden; }
   </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
-  <!-- Підключаємо бібліотеки через старий добрий <script src> -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/ARButton.js"></script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-  <script>
     let camera, scene, renderer;
     let carModel = null;
     let modelPlaced = false;
@@ -40,10 +47,10 @@
       scene.add(hemiLight);
 
       // ARButton
-      document.body.appendChild(THREE.ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
       // Завантаження моделі
-      const loader = new THREE.GLTFLoader();
+      const loader = new GLTFLoader();
       loader.load('car/car2.glb',
         function (gltf) {
           carModel = gltf.scene;
