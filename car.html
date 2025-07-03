@@ -2,30 +2,90 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Авто — WebXR (дві машини)</title>
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.176.0/build/three.module.js",
-      "ARButton": "https://unpkg.com/three@0.176.0/examples/jsm/webxr/ARButton.js",
-      "GLTFLoader": "https://unpkg.com/three@0.176.0/examples/jsm/loaders/GLTFLoader.js"
-    }
-  }
-  </script>
+  <title>AR Автомобілі — як з роботом</title>
   <style>
-    body { margin: 0; background: #181a20; }
+    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
     #info {
-      position:fixed;top:10px;left:0;right:0;z-index:10;text-align:center;color:#fff;font-family:sans-serif;
+      position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
+      color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
+      text-shadow: 0 1px 8px #000c;
+      font-size: 1.13em;
+      pointer-events: none;
+      user-select: none;
     }
-    canvas { display: block; }
   </style>
 </head>
 <body>
   <div id="info">
-    Натисніть <b>Enter AR</b>, доторкніться до поверхні — дві машини з'являться поруч.<br>
-    Потрібен телефон із WebXR (Chrome/Android або Safari/iOS 16.4+).
+    <b>AR Автомобілі — можна обійти з усіх боків!</b><br>
+    Просто увімкни AR — обидві машини одразу з'являться у просторі.<br>
+    (Якщо зависають у повітрі — змінюй <code>position.y</code>)
   </div>
-  <script type="module" src="./webxr-cars.js"></script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
+
+    let camera, scene, renderer;
+    let carsAdded = false;
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      document.body.appendChild(ARButton.createButton(renderer));
+
+      // Світло
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+      scene.add(new THREE.DirectionalLight(0xffffff, 0.7).position.set(0, 10, 10));
+
+      // Додаємо машини ОДРАЗУ при старті AR-сесії
+      renderer.xr.addEventListener('sessionstart', () => {
+        if (carsAdded) return;
+        carsAdded = true;
+
+        const loader = new GLTFLoader();
+
+        // 1-а машина (зліва)
+        loader.load('car/car1.glb', (gltf1) => {
+          const car1 = gltf1.scene;
+          car1.position.set(-0.4, -0.5, -1.0); // X: зліва, Y: на підлогу, Z: вперед
+          car1.scale.set(0.32, 0.32, 0.32); // Підібрай масштаб під свою модель!
+          scene.add(car1);
+        }, undefined, () => {
+          alert('Не вдалося завантажити car1.glb');
+        });
+
+        // 2-а машина (справа)
+        loader.load('car/car2.glb', (gltf2) => {
+          const car2 = gltf2.scene;
+          car2.position.set(0.4, -0.5, -1.0); // X: справа, Y: на підлогу, Z: вперед
+          car2.scale.set(0.32, 0.32, 0.32);
+          scene.add(car2);
+        }, undefined, () => {
+          alert('Не вдалося завантажити car2.glb');
+        });
+      });
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+  </script>
 </body>
 </html>
