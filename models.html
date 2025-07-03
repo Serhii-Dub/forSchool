@@ -19,27 +19,27 @@
     const camera = new THREE.PerspectiveCamera(
       60, window.innerWidth / window.innerHeight, 0.1, 100
     );
-    camera.position.set(0, 1.5, 5);
+    camera.position.set(0, 1.5, 8);
 
     // Рендерер
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Додаємо OrbitControls для керування камерою мишкою
+    // OrbitControls
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1, 0); // фокус на центр
+    controls.target.set(0, 1, 0);
     controls.update();
 
     // Освітлення
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(3, 10, 10);
     scene.add(dirLight);
 
     // (Опціонально) Додаємо осі координат
-    const axesHelper = new THREE.AxesHelper(2);
-    scene.add(axesHelper);
+    // const axesHelper = new THREE.AxesHelper(2);
+    // scene.add(axesHelper);
 
     // GLTF Loader
     const loader = new THREE.GLTFLoader();
@@ -47,8 +47,8 @@
     // Ліва модель (model.glb)
     loader.load('models/model.glb', function(gltf) {
       const modelLeft = gltf.scene;
-      modelLeft.position.set(-3.5, 0, 0); // ліворуч
-      modelLeft.scale.set(0.095, 0.095, 0.095); // зменшуємо модель, якщо треба ще менше — став 0.2
+      modelLeft.position.set(-2.5, 0, 0); // зліва
+      modelLeft.scale.set(0.12, 0.12, 0.12); // scale під себе!
       scene.add(modelLeft);
     }, undefined, function(e) {
       console.error('Не вдалося завантажити model.glb', e);
@@ -57,8 +57,8 @@
     // Права модель (model2.glb)
     loader.load('models/model2.glb', function(gltf) {
       const modelRight = gltf.scene;
-      modelRight.position.set(-0.5, 0, -27); // праворуч і трохи вперед
-      modelRight.scale.set(0.5, 0.5, 0.5);
+      modelRight.position.set(2.5, 0, 0); // справа
+      modelRight.scale.set(1.0, 1.0, 1.0); // scale під себе!
       scene.add(modelRight);
     }, undefined, function(e) {
       console.error('Не вдалося завантажити model2.glb', e);
