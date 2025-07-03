@@ -6,6 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { margin: 0; overflow: hidden; }
+    .ar-button, .webxr-ar-button {
+      position: fixed !important;
+      left: 50% !important;
+      bottom: 40px !important;
+      transform: translateX(-50%) !important;
+      background: #26d0ce !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: 2em !important;
+      font-size: 2.1em !important;
+      padding: 1em 2.2em !important;
+      font-family: 'Segoe UI', Arial, sans-serif !important;
+      box-shadow: 0 4px 24px #26d0ce77, 0 1.5px 5px #4442 !important;
+      z-index: 99999 !important;
+      cursor: pointer !important;
+      transition: background 0.2s;
+    }
+    .ar-button:hover, .webxr-ar-button:hover {
+      background: #087ee0 !important;
+      color: #fff !important;
+    }
   </style>
   <script type="importmap">
     {
@@ -53,8 +74,8 @@
       loader.load('car/car2.glb',
         function (gltf) {
           carModel = gltf.scene;
-          carModel.scale.set(2, 2, 2); // МЕГАВЕЛИКИЙ РОЗМІР
-          carModel.position.set(0, 1, -2); // ВИСОКО й ДАЛЕКО
+          carModel.scale.set(2, 2, 2); // дуже великий розмір
+          carModel.position.set(0, 1, -2);
           carModel.visible = false;
           scene.add(carModel);
         },
@@ -114,7 +135,7 @@
 
           carModel.position.set(
             pose.transform.position.x,
-            pose.transform.position.y + 1, // ВИСОКО над підлогою
+            pose.transform.position.y + 1,
             pose.transform.position.z
           );
           carModel.quaternion.set(
