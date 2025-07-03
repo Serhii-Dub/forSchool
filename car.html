@@ -2,61 +2,49 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Автомобілі (WebXR + Three.js)</title>
+  <title>AR Автомобілі — Simple</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin:0; background:#000; color:#fff; font-family:sans-serif;}
-    #model-select {position:fixed;top:10px;left:10px;z-index:10;font-size:18px;}
-    #start-ar {position:fixed;top:10px;right:10px;z-index:10;padding:10px 18px;font-size:18px;background:#222;color:#fff;border:none;border-radius:8px;}
-    #info {position:fixed;bottom:10px;left:10px;right:10px;text-align:center;color:#fff;}
+    body { margin:0; background:#111; color:#fff; }
+    #start-ar { position:fixed;top:20px;right:20px;z-index:10;padding:12px 24px;font-size:18px;background:#222;border:none;color:#fff;border-radius:8px; }
+    #info { position:fixed;bottom:20px;left:0;right:0;text-align:center;color:#fff; }
   </style>
 </head>
 <body>
-  <select id="model-select">
-    <option value="car/car1.glb">Авто 1</option>
-    <option value="car/car2.glb">Авто 2</option>
-    <option value="car/car3.glb">Авто 3</option>
-  </select>
   <button id="start-ar">Запустити AR</button>
-  <div id="info">Виберіть авто, натисніть "Запустити AR" і торкніться поверхні для розміщення моделі.<br>Використовуйте телефон із підтримкою AR (Android Chrome, iOS Safari).</div>
+  <div id="info">Натисніть кнопку й розмістіть машини, торкнувшись поверхні.<br>WebXR потрібен Chrome Android або iOS Safari (16.4+)</div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js"></script>
   <script>
-    let camera, scene, renderer, controller, reticle, currentModel = null, modelUrl;
+    let camera, scene, renderer, controller, reticle, cars = [];
 
-    // AR підтримка
-    const startButton = document.getElementById('start-ar');
-    const select = document.getElementById('model-select');
-    select.onchange = () => { modelUrl = select.value; };
-    modelUrl = select.value;
-
-    startButton.onclick = async () => {
-      startButton.style.display = 'none';
-      select.style.display = 'none';
+    document.getElementById('start-ar').onclick = () => {
+      document.getElementById('start-ar').style.display = 'none';
       document.getElementById('info').style.display = 'none';
-      await startAR();
+      startAR();
     };
 
-    async function startAR() {
-      // Сцена
+    function startAR() {
+      // сцена
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera();
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
       renderer.xr.setReferenceSpaceType('local');
       document.body.appendChild(renderer.domElement);
 
-      // AR Button (WebXR)
+      // WebXR кнопка
       document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
       // Світло
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      const light = new THREE.HemisphereLight(0xffffff, 0x444455, 1.2);
       scene.add(light);
 
-      // Reticle (для визначення поверхні)
+      // Reticle (кільце для позиції)
       const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI/2);
       const material = new THREE.MeshBasicMaterial({ color:0x00ff88 });
       reticle = new THREE.Mesh(geometry, material);
@@ -64,12 +52,12 @@
       reticle.visible = false;
       scene.add(reticle);
 
-      // Можливість розмістити авто по тапу
+      // Контролер для тапу
       controller = renderer.xr.getController(0);
       controller.addEventListener('select', onSelect);
       scene.add(controller);
 
-      // Hit Test Source
+      // HitTest
       let hitTestSource = null;
       let hitTestSourceRequested = false;
 
@@ -106,22 +94,24 @@
       });
     }
 
-    // Розміщення авто
+    // Коли тапаєш — розміщуються всі три машини поруч
     function onSelect() {
-      if (reticle.visible) {
-        if (currentModel) {
-          scene.remove(currentModel);
-          currentModel = null;
-        }
-        // Завантаження вибраного авто
+      if (reticle.visible && cars.length === 0) {
+        const models = ['car/car1.glb', 'car/car2.glb', 'car/car3.glb'];
         const loader = new THREE.GLTFLoader();
-        loader.load(modelUrl, function (gltf) {
-          currentModel = gltf.scene;
-          currentModel.position.setFromMatrixPosition(reticle.matrix);
-          currentModel.scale.set(0.8,0.8,0.8); // змінюй якщо треба
-          scene.add(currentModel);
-        }, undefined, function (error) {
-          alert("Не вдалося завантажити модель!");
+
+        models.forEach((url, i) => {
+          loader.load(url, function(gltf) {
+            let model = gltf.scene;
+            // Розмістити машини з інтервалом 0.7 метра
+            model.position.setFromMatrixPosition(reticle.matrix);
+            model.position.x += (i - 1) * 0.7; // -0.7, 0, +0.7
+            model.scale.set(0.8,0.8,0.8);
+            scene.add(model);
+            cars.push(model);
+          }, undefined, function(error){
+            alert('Не вдалося завантажити: ' + url);
+          });
         });
       }
     }
