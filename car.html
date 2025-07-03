@@ -24,12 +24,20 @@
       position:absolute; top:30px; left:50%; transform:translateX(-50%);
       background:rgba(0,0,0,0.5); color:#fff; font-size:1.2em; padding:1em 2em; border-radius:1em; z-index:11;
     }
+    /* Ховаємо three.js AR-кнопку повністю! */
+    .ar-button, .ARButton {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
   </style>
 </head>
 <body>
   <div id="desc">
     <b>Віртуальні автомобілі у доповненій реальності</b><br>
-    </div>
+    Натисніть кнопку нижче для запуску AR. Ви зможете подивитися на обидві моделі машин з усіх сторін.
+  </div>
   <button id="start-ar">Увійти в AR</button>
   <script type="module">
     import * as THREE from 'three';
@@ -37,7 +45,6 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     let camera, scene, renderer;
-    let modelsLoaded = 0;
     let car1, car2;
 
     document.getElementById('start-ar').onclick = () => {
@@ -59,39 +66,33 @@
       // Яскраве світло
       scene.add(new THREE.HemisphereLight(0xffffff, 0x222233, 2.5));
 
-      // Завантаження двох моделей:
-      const loader = new GLTFLoader();
+      // AR-кнопка (захована стилями)
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
 
-      loader.load('car/car1.glb', gltf => {
-        car1 = gltf.scene;
-        car1.scale.set(0.02,0.02,0.02);
-        modelsLoaded++;
-        if (modelsLoaded === 2) placeModels();
+      renderer.xr.addEventListener('sessionstart', () => {
+        // Завантажуємо моделі тільки після старту XR сесії!
+        const loader = new GLTFLoader();
+
+        loader.load('car/car1.glb', gltf => {
+          car1 = gltf.scene;
+          car1.scale.set(0.02, 0.02, 0.02);
+          // З'явиться прямо перед камерою на висоті "очей":
+          car1.position.set(-2, -4, -1.2);
+          scene.add(car1);
+        });
+
+        loader.load('car/car2.glb', gltf => {
+          car2 = gltf.scene;
+          car2.scale.set(0.02, 0.02, 0.02);
+          // Трохи правіше і ближче:
+          car2.position.set(0.5, 0, -1.0);
+          scene.add(car2);
+        });
       });
-
-      loader.load('car/car2.glb', gltf => {
-        car2 = gltf.scene;
-        car2.scale.set(0.02,0.02,0.02);
-        modelsLoaded++;
-        if (modelsLoaded === 2) placeModels();
-      });
-
-      // AR-кнопка
-      document.body.appendChild(ARButton.createButton(renderer, {requiredFeatures: []}));
 
       renderer.setAnimationLoop(() => {
         renderer.render(scene, camera);
       });
-    }
-
-    function placeModels() {
-      // Камера на момент входу у AR (XR ReferenceSpace origin)
-      // car1 перед камерою, car2 трохи правіше і ближче до глядача
-
-      car1.position.set(-2, -3, -1.2); // 1.2 метра попереду
-      car2.position.set(0.5, 1, -1.0); // праворуч і трохи ближче
-      scene.add(car1);
-      scene.add(car2);
     }
   </script>
 </body>
