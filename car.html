@@ -2,90 +2,117 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Автомобілі — як з роботом</title>
+  <title>Безмаркерна AR — Машинка</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
-    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
-    #info {
-      position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
-      color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
-      text-shadow: 0 1px 8px #000c;
-      font-size: 1.13em;
-      pointer-events: none;
-      user-select: none;
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #222; }
+    #ar-button {
+      position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
+      background: #3a8c3a; color: #fff; padding: 18px 36px; border: none; border-radius: 16px;
+      font-size: 1.2em; cursor: pointer; z-index: 999;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     }
   </style>
 </head>
 <body>
-  <div id="info">
-    <b>AR Автомобілі — можна обійти з усіх боків!</b><br>
-    Просто увімкни AR — обидві машини одразу з'являться у просторі.<br>
-    (Якщо зависають у повітрі — змінюй <code>position.y</code>)
-  </div>
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
+  <button id="ar-button">Увімкнути AR</button>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js"></script>
+  <script>
+    let camera, scene, renderer, controller, reticle, carModel;
+    let selectedCar = 'car/car1.glb'; // або 'car/car2.glb'
 
-    let camera, scene, renderer;
-    let carsAdded = false;
+    // Селектор моделі (можна кнопки, або просто змінюй шлях)
+    // selectedCar = 'car/car2.glb'; // щоб змінити модель
 
-    init();
-    animate();
+    // Кнопка запуску AR
+    const arButton = document.getElementById('ar-button');
 
-    function init() {
+    arButton.addEventListener('click', () => {
+      arButton.style.display = 'none';
+      startAR();
+    });
+
+    function startAR() {
+      // Renderer з підтримкою WebXR
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType('local');
+      document.body.appendChild(renderer.domElement);
+
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera();
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-
-      // ВАЖЛИВО: не передавай аргументів у createButton()
-      // ARButton сам вибере AR/VR чи nothing
-      document.body.appendChild(ARButton.createButton(renderer));
-
       // Світло
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
-      scene.add(new THREE.DirectionalLight(0xffffff, 0.7).position.set(0, 10, 10));
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      scene.add(light);
 
-      // Додаємо машини при старті AR-сесії
-      renderer.xr.addEventListener('sessionstart', () => {
-        if (carsAdded) return;
-        carsAdded = true;
+      // Reticle — покажчик площини
+      reticle = new THREE.Mesh(
+        new THREE.RingGeometry(0.11, 0.15, 32).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0x44ff44, opacity: 0.6, transparent: true })
+      );
+      reticle.matrixAutoUpdate = false;
+      reticle.visible = false;
+      scene.add(reticle);
 
-        const loader = new GLTFLoader();
-
-        // 1-а машина (зліва)
-        loader.load('car/car1.glb', (gltf1) => {
-          const car1 = gltf1.scene;
-          car1.position.set(-0.4, -0.5, -1.0); // X: зліва, Y: на підлогу, Z: вперед
-          car1.scale.set(0.32, 0.32, 0.32);
-          scene.add(car1);
-        }, undefined, () => {
-          alert('Не вдалося завантажити car1.glb');
-        });
-
-        // 2-а машина (справа)
-        loader.load('car/car2.glb', (gltf2) => {
-          const car2 = gltf2.scene;
-          car2.position.set(0.4, -0.5, -1.0); // X: справа, Y: на підлогу, Z: вперед
-          car2.scale.set(0.32, 0.32, 0.32);
-          scene.add(car2);
-        }, undefined, () => {
-          alert('Не вдалося завантажити car2.glb');
-        });
+      // Завантажуємо модель, але додаємо лише після tap
+      const loader = new THREE.GLTFLoader();
+      loader.load(selectedCar, gltf => {
+        carModel = gltf.scene;
+        carModel.visible = false; // Додаємо пізніше
+        carModel.scale.set(0.4, 0.4, 0.4); // змінюй під свій glb
+        scene.add(carModel);
       });
 
-      window.addEventListener('resize', () => {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    }
+      // AR Button (WebXR)
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-    function animate() {
-      renderer.setAnimationLoop(() => {
+      // AR Session
+      let hitTestSource = null;
+      let hitTestSourceRequested = false;
+
+      renderer.setAnimationLoop(function (timestamp, frame) {
+        if (frame) {
+          const referenceSpace = renderer.xr.getReferenceSpace();
+          const session = renderer.xr.getSession();
+
+          if (!hitTestSourceRequested) {
+            session.requestReferenceSpace('viewer').then((referenceSpace) => {
+              session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                hitTestSource = source;
+              });
+            });
+            hitTestSourceRequested = true;
+          }
+
+          if (hitTestSource) {
+            const viewerPose = frame.getViewerPose(referenceSpace);
+            if (viewerPose) {
+              const hitTestResults = frame.getHitTestResults(hitTestSource);
+              if (hitTestResults.length > 0) {
+                const hit = hitTestResults[0];
+                const pose = hit.getPose(referenceSpace);
+                reticle.visible = true;
+                reticle.matrix.fromArray(pose.transform.matrix);
+              } else {
+                reticle.visible = false;
+              }
+            }
+          }
+        }
         renderer.render(scene, camera);
+      });
+
+      // Tap to place car
+      renderer.domElement.addEventListener('click', (event) => {
+        if (reticle.visible && carModel && !carModel.visible) {
+          carModel.position.setFromMatrixPosition(reticle.matrix);
+          carModel.quaternion.setFromRotationMatrix(reticle.matrix);
+          carModel.visible = true;
+        }
       });
     }
   </script>
