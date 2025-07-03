@@ -1,0 +1,11 @@
+Model Information:
+* title:	2019_lbworks_bmw_i8_ver_2
+* source:	https://sketchfab.com/3d-models/2019-lbworks-bmw-i8-ver-2-557b4c2b79bd405da90b235aa2f70553
+* author:	akamujoshua (https://sketchfab.com/akamujoshua)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "2019_lbworks_bmw_i8_ver_2" (https://sketchfab.com/3d-models/2019-lbworks-bmw-i8-ver-2-557b4c2b79bd405da90b235aa2f70553) by akamujoshua (https://sketchfab.com/akamujoshua) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
