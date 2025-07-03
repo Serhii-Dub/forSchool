@@ -1,165 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
-    <meta charset="utf-8">
-    <title>WebXR Car GLB Example</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
-        }
+  <meta charset="utf-8">
+  <title>AR Автомобілі — Інформатика</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
     }
-    </script>
-    <style>
-        body { margin: 0; padding: 0; background: #000; color: #fff; font-family: Arial, sans-serif; }
-        #container { position: relative; width: 100%; height: 100vh; }
-        #ui { 
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px;
-            max-width: 300px;
-        }
-        #ar-button { 
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; padding: 15px 30px; font-size: 18px;
-            background: #007bff; color: white; border: none; border-radius: 25px;
-            cursor: pointer;
-        }
-        #status { margin-top: 10px; font-size: 14px; }
-    </style>
+  }
+  </script>
+  <style>
+    html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+    #start-ar {
+      position: absolute; left:50%; top:60%; transform:translate(-50%,0);
+      padding: 24px 42px; border:none; font-size:2em; border-radius:2em;
+      background: #1a77d4; color:#fff; cursor:pointer; box-shadow: 0 4px 24px #0008;
+      z-index:10;
+    }
+    #desc {
+      position:absolute; top:30px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.5); color:#fff; font-size:1.2em; padding:1em 2em; border-radius:1em; z-index:11;
+    }
+  </style>
 </head>
 <body>
-    <div id="container">
-        <div id="ui">
-            <h3>WebXR Car GLB AR</h3>
-            <div id="info">Натисніть кнопку AR для початку</div>
-            <div id="status"></div>
-        </div>
-        <button id="ar-button">Увійти до AR</button>
-    </div>
+  <div id="desc">
+    <b>Віртуальні автомобілі у доповненій реальності</b><br>
+    Натисніть кнопку нижче для запуску AR. Ви зможете подивитися на обидві моделі машин з усіх сторін.
+  </div>
+  <button id="start-ar">Увійти в AR</button>
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        
-        class WebXRCarGLBApp {
-            constructor() {
-                this.scene = null;
-                this.camera = null;
-                this.renderer = null;
-                this.hitTestSource = null;
-                this.reticle = null;
-                this.models = [];
-            }
-            
-            async init() {
-                this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-                
-                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-                this.renderer.setPixelRatio(window.devicePixelRatio);
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.xr.enabled = true;
-                
-                document.getElementById('container').appendChild(this.renderer.domElement);
-                
-                const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-                this.scene.add(light);
-                
-                this.createReticle();
-                
-                // Створити AR-кнопку
-                const arButton = ARButton.createButton(this.renderer, {
-                    requiredFeatures: ['hit-test'],
-                    optionalFeatures: ['dom-overlay'],
-                    domOverlay: { root: document.body }
-                });
-                document.body.appendChild(arButton);
-                
-                this.setupXREvents();
-                this.setupControllers();
-                this.renderer.setAnimationLoop(() => this.render());
-                
-                document.getElementById('info').textContent = 'AR готовий до використання';
-            }
-            
-            createReticle() {
-                const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
-                const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                this.reticle = new THREE.Mesh(geometry, material);
-                this.reticle.matrixAutoUpdate = false;
-                this.reticle.visible = false;
-                this.scene.add(this.reticle);
-            }
-            
-            setupXREvents() {
-                this.renderer.xr.addEventListener('sessionstart', async () => {
-                    document.getElementById('info').textContent = 'AR сесія активна';
-                    const session = this.renderer.xr.getSession();
-                    const viewerReferenceSpace = await session.requestReferenceSpace('viewer');
-                    this.hitTestSource = await session.requestHitTestSource({ space: viewerReferenceSpace });
-                });
-                
-                this.renderer.xr.addEventListener('sessionend', () => {
-                    document.getElementById('info').textContent = 'AR сесія завершена';
-                    this.hitTestSource = null;
-                });
-            }
-            
-            setupControllers() {
-                const controller = this.renderer.xr.getController(0);
-                controller.addEventListener('select', () => this.onSelect());
-                this.scene.add(controller);
-            }
-            
-            onSelect() {
-                if (this.reticle.visible) {
-                    this.loadGLBModel('https://serhii-dub.github.io/car/car1.glb', this.reticle.matrix);
-                }
-            }
-            
-            loadGLBModel(url, matrix) {
-                const loader = new GLTFLoader();
-                loader.load(url, (gltf) => {
-                    const model = gltf.scene;
-                    model.position.setFromMatrixPosition(matrix);
-                    model.quaternion.setFromRotationMatrix(matrix);
-                    model.scale.set(0.4, 0.4, 0.4); // Підбери під свою модель!
-                    this.scene.add(model);
-                    this.models.push(model);
-                    document.getElementById('info').textContent = `Модель завантажено!`;
-                }, undefined, (error) => {
-                    document.getElementById('info').textContent = `Помилка завантаження GLB: ${error}`;
-                });
-            }
-            
-            updateHitTest(frame) {
-                if (!this.hitTestSource) return;
-                const hitTestResults = frame.getHitTestResults(this.hitTestSource);
-                if (hitTestResults.length > 0) {
-                    const hit = hitTestResults[0];
-                    const referenceSpace = this.renderer.xr.getReferenceSpace();
-                    const hitPose = hit.getPose(referenceSpace);
-                    this.reticle.visible = true;
-                    this.reticle.matrix.fromArray(hitPose.transform.matrix);
-                } else {
-                    this.reticle.visible = false;
-                }
-            }
-            
-            render() {
-                const frame = this.renderer.xr.getFrame();
-                if (frame) this.updateHitTest(frame);
-                this.renderer.render(this.scene, this.camera);
-            }
-        }
-        
-        document.getElementById('ar-button').onclick = async () => {
-            const app = new WebXRCarGLBApp();
-            await app.init();
-        };
-    </script>
+    let camera, scene, renderer;
+    let modelsLoaded = 0;
+    let car1, car2;
+
+    document.getElementById('start-ar').onclick = () => {
+      document.getElementById('start-ar').style.display = 'none';
+      document.getElementById('desc').style.display = 'none';
+      startAR();
+    };
+
+    function startAR() {
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      // Яскраве світло
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x222233, 2.5));
+
+      // Завантаження двох моделей:
+      const loader = new GLTFLoader();
+
+      loader.load('car/car1.glb', gltf => {
+        car1 = gltf.scene;
+        car1.scale.set(0.5,0.5,0.5);
+        modelsLoaded++;
+        if (modelsLoaded === 2) placeModels();
+      });
+
+      loader.load('car/car2.glb', gltf => {
+        car2 = gltf.scene;
+        car2.scale.set(0.5,0.5,0.5);
+        modelsLoaded++;
+        if (modelsLoaded === 2) placeModels();
+      });
+
+      // AR-кнопка
+      document.body.appendChild(ARButton.createButton(renderer, {requiredFeatures: []}));
+
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+
+    function placeModels() {
+      // Камера на момент входу у AR (XR ReferenceSpace origin)
+      // car1 перед камерою, car2 трохи правіше і ближче до глядача
+
+      car1.position.set(0, 0, -1.2); // 1.2 метра попереду
+      car2.position.set(0.5, 0, -1.0); // праворуч і трохи ближче
+      scene.add(car1);
+      scene.add(car2);
+    }
+  </script>
 </body>
 </html>
