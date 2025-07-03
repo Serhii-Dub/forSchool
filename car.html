@@ -2,55 +2,69 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
-  <title>AR Car Demo</title>
+  <title>VR Car Demo</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    #ar-button { position: absolute; top: 20px; left: 20px; z-index: 1; }
+    #info {
+      position: absolute; top: 10px; left: 10px;
+      padding: 5px 10px; background: rgba(0,0,0,0.5);
+      color: #fff; font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
-  <!-- Кнопка входу в AR -->
-  <div id="ar-button"></div>
+  <div id="info">Натисніть Enter VR, щоб увійти в режим віртуальної реальності</div>
 
   <script type="module">
     import * as THREE from 'three';
+    import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-    import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 
     let camera, scene, renderer;
-    let loader = new GLTFLoader();
 
     init();
     animate();
 
     function init() {
-      // Сцена і камера
+      // Сцена й камера
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 1.6, 0);
 
-      // Рендерер з підтримкою WebXR
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      // Рендерер з WebXR
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
+      document.body.appendChild(VRButton.createButton(renderer));
 
-      // Додавання кнопки AR
-      document.getElementById('ar-button').appendChild(ARButton.createButton(renderer, {
-        requiredFeatures: ['hit-test']
-      }));
-
-      // Світло
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      // Освітлення
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+      light.position.set(0, 1, 0);
       scene.add(light);
 
-      // Завантаження моделі
-      loader.load('car/car2.glb', gltf => {
-        const car = gltf.scene;
-        car.position.set(0, 0, -1);      // 1 метр перед камерою
-        car.rotation.y = Math.PI;        // повернути в потрібний бік
-        car.scale.set(0.5, 0.5, 0.5);    // масштаб
-        scene.add(car);
-      });
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(5, 10, 7.5);
+      scene.add(dirLight);
+
+      // Земна площина для орієнтації
+      const grid = new THREE.GridHelper(10, 10, 0x888888, 0x444444);
+      scene.add(grid);
+
+      // Завантаження моделі автомобіля
+      const loader = new GLTFLoader();
+      loader.load(
+        'car/car2.glb',
+        gltf => {
+          const car = gltf.scene;
+          car.position.set(0, 0, -2);   // 2 метри перед стартовою точкою
+          car.scale.set(0.5, 0.5, 0.5); // при потребі змініть масштаб
+          scene.add(car);
+        },
+        undefined,
+        err => console.error('Помилка завантаження моделі:', err)
+      );
 
       window.addEventListener('resize', onWindowResize);
     }
@@ -65,8 +79,7 @@
       renderer.setAnimationLoop(render);
     }
 
-    function render(timestamp, frame) {
-      // Опціонально: hit-test для точного розташування
+    function render() {
       renderer.render(scene, camera);
     }
   </script>
