@@ -58,7 +58,7 @@
     loader.load('models/model2.glb', function(gltf) {
       const modelRight = gltf.scene;
       modelRight.position.set(2.5, 0, 0); // справа
-      modelRight.scale.set(1.0, 1.0, 1.0); // scale під себе!
+      modelRight.scale.set(10.0, 10.0, 10.0); // scale під себе!
       scene.add(modelRight);
     }, undefined, function(e) {
       console.error('Не вдалося завантажити model2.glb', e);
