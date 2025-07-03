@@ -1,135 +1,40 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8" />
-  <title>AR Car Demo</title>
+  <meta charset="UTF-8">
+  <title>AR машинка (Scene Viewer)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; overflow: hidden; }
-    #message {
-      position: absolute;
-      top: 10px; left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.5);
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #222;
+    }
+    button {
+      font-size: 2em;
+      background: #3a8c3a;
       color: #fff;
-      font-family: sans-serif;
-      border-radius: 4px;
+      padding: 22px 42px;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+      transition: background 0.2s;
+    }
+    button:active {
+      background: #2c662c;
     }
   </style>
 </head>
 <body>
-  <div id="message">Натисніть “Enter AR” і наведіть камеру на підлогу</div>
-
-  <script type="module">
-    import * as THREE from 'three';
-    import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
-    import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
-    let camera, scene, renderer;
-    let reticle, hitTestSource = null, hitTestSourceRequested = false;
-    let carModel;
-
-    init();
-    renderer.setAnimationLoop(render);
-
-    function init() {
-      scene  = new THREE.Scene();
-
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
-      camera.position.set(0, 1.6, 0);
-
-      // Рендерер з прозорим фоном і WebXR
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-
-      // Кнопка входу в AR
-      document.body.appendChild(
-        ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] })
-      );
-
-      // Світло
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-      light.position.set(0, 1, 0);
-      scene.add(light);
-
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-      dirLight.position.set(0, 5, 5);
-      scene.add(dirLight);
-
-      // Ретикул (тільки для візуалізації місця підстановки)
-      const ringGeo = new THREE.RingGeometry(0.1, 0.11, 32).rotateX(- Math.PI/2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-      reticle = new THREE.Mesh(ringGeo, ringMat);
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
-
-      // Завантажуємо GLB-модель, але ще не додаємо в сцену
-      new GLTFLoader().load('car/car2.glb',
-        gltf => {
-          carModel = gltf.scene;
-          carModel.scale.set(0.5, 0.5, 0.5);
-        },
-        undefined,
-        err => console.error('GLTF load error:', err)
-      );
-
-      window.addEventListener('resize', onWindowResize);
-    }
-
-    function onWindowResize() {
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    function render(timestamp, frame) {
-      if (frame) {
-        const referenceSpace = renderer.xr.getReferenceSpace();
-        const session        = renderer.xr.getSession();
-
-        // 1) Запит джерела хит-тесту лише одного разу
-        if (!hitTestSourceRequested) {
-          session.requestReferenceSpace('viewer').then(viewerSpace => {
-            session.requestHitTestSource({ space: viewerSpace }).then(source => {
-              hitTestSource = source;
-            });
-          });
-          session.addEventListener('end', () => {
-            hitTestSourceRequested = false;
-            hitTestSource = null;
-          });
-          hitTestSourceRequested = true;
-        }
-
-        // 2) Виконуємо хит-тест і відображаємо ретикул
-        if (hitTestSource) {
-          const results = frame.getHitTestResults(hitTestSource);
-          if (results.length) {
-            const hit = results[0];
-            const pose = hit.getPose(referenceSpace);
-
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-
-            // 3) Разова підстановка моделі саме в точку ретикулу
-            if (carModel && !carModel.parent) {
-              carModel.position.setFromMatrixPosition(reticle.matrix);
-              carModel.quaternion.setFromRotationMatrix(reticle.matrix);
-              scene.add(carModel);
-              document.getElementById('message').style.display = 'none';
-            }
-          } else {
-            reticle.visible = false;
-          }
-        }
-      }
-
-      renderer.render(scene, camera);
-    }
-  </script>
+  <a
+    rel="ar"
+    href="https://serhii-dub.github.io/car/car1.glb"
+    style="text-decoration:none;"
+  >
+    <button>Показати машинку в AR</button>
+  </a>
 </body>
 </html>
