@@ -2,156 +2,239 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Робот з жестами</title>
+  <title>AR Робот — свайпи та анімації</title>
   <style>
-    html, body { margin:0; padding:0; overflow:hidden; background:#222;}
+    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
     #info {
       position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
       color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
       text-shadow: 0 1px 8px #000c;
-      font-size: 1.15em;
-    }
-    #video {
-      position: fixed; top:0; left:0; width:120px; height:90px; z-index:5; opacity:0.3; pointer-events:none;
+      font-size: 1.13em;
+      pointer-events: none;
+      user-select: none;
     }
   </style>
 </head>
 <body>
   <div id="info">
-    <b>AR Робот – керування жестами:</b><br>
-    ✋ відкрита долоня — стоїть<br>
-    👊 кулак — зміна кольору<br>
-    (Розпізнання жестів через камеру)
+    <b>AR Робот – керування свайпами:</b><br>
+    Свайп вгору — вперед | вниз — назад | вліво — вліво | вправо — вправо<br>
+    Тап по роботу — зміна кольору<br>
+    (WebXR AR: камера відкривається тільки в AR-режимі)
   </div>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas3d"></canvas>
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
 
-    // === MediaPipe Hands ===
-    import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
+    let camera, scene, renderer;
+    let robot, robotColor = 0x1ec8e7;
+    let startX = null, startY = null, dragging = false;
+    let animating = false;
+    let targetPos = new THREE.Vector3();
 
-    let handLandmarker, video, robot, robotColor = 0x1ec8e7, isFist = false;
-    let scene, camera, renderer;
+    init();
+    animate();
 
-    async function initHandTracking() {
-      handLandmarker = await HandLandmarker.createFromOptions(
-        await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'),
-        {numHands: 1, runningMode: "VIDEO"}
-      );
-
-      video = document.getElementById("video");
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-        .then((stream) => {
-          video.srcObject = stream;
-          video.play();
-          requestAnimationFrame(trackHands);
-        });
-    }
-
-    function isOpenPalm(landmarks) {
-      // Відстань від зап’ястя до кінчика середнього пальця більша ніж у кулака
-      if (!landmarks) return false;
-      const wrist = landmarks[0], mid = landmarks[12];
-      const dist = Math.hypot(mid.x - wrist.x, mid.y - wrist.y);
-      // пальці прямі — кінчик середнього далеко від зап'ястя
-      return dist > 0.25 && isAllFingersOpen(landmarks);
-    }
-
-    function isFistGesture(landmarks) {
-      // Всі кінчики пальців близько до зап’ястя
-      if (!landmarks) return false;
-      let closed = 0;
-      [8,12,16,20].forEach(i => {
-        const tip = landmarks[i], wrist = landmarks[0];
-        if (Math.hypot(tip.x-wrist.x, tip.y-wrist.y)<0.12) closed++;
-      });
-      return closed >= 3;
-    }
-    function isAllFingersOpen(landmarks) {
-      // Перевірити чи всі пальці відкриті
-      if (!landmarks) return false;
-      let open = 0;
-      [8,12,16,20].forEach(i => {
-        const tip = landmarks[i], pip = landmarks[i-2];
-        if (tip.y < pip.y) open++;
-      });
-      return open >= 3;
-    }
-
-    async function trackHands() {
-      if (!video || video.readyState !== 4) {
-        requestAnimationFrame(trackHands);
-        return;
-      }
-      const results = handLandmarker.detectForVideo(video, performance.now());
-      let gesture = "none";
-      if (results.landmarks && results.landmarks.length > 0) {
-        const lm = results.landmarks[0];
-        if (isFistGesture(lm)) gesture = "fist";
-        else if (isOpenPalm(lm)) gesture = "palm";
-      }
-
-      // === Реакція на жести ===
-      if (gesture === "palm") {
-        robot.userData.state = "stand";
-      } else if (gesture === "fist" && !isFist) {
-        robotColor = Math.random()*0xffffff;
-        robot.traverse(child=>{if(child.isMesh) child.material.color.setHex(robotColor)});
-        isFist = true;
-      } else if (gesture !== "fist") {
-        isFist = false;
-      }
-      requestAnimationFrame(trackHands);
-    }
-
-    // === THREE.js сцена ===
-    function initThree() {
+    function init() {
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 100);
-      camera.position.set(0,0.25,1.1);
+      camera = new THREE.PerspectiveCamera();
 
-      renderer = new THREE.WebGLRenderer({canvas:document.getElementById("canvas3d"), alpha:true, antialias:true});
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
 
-      // Робот
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+      // --- Робот ---
       robot = new THREE.Group();
-      let mat = new THREE.MeshPhongMaterial({color:robotColor});
-      let body = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.33,0.1), mat.clone());
-      body.position.y = 0.17; robot.add(body);
-      let head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.13), mat.clone());
-      head.position.y = 0.34; robot.add(head);
-      let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.18,0.06), mat.clone());
-      leg1.position.set(-0.06,0.04,0); robot.add(leg1);
-      let leg2 = leg1.clone(); leg2.position.set(0.06,0.04,0); robot.add(leg2);
-      let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.05), mat.clone());
-      arm1.position.set(-0.15,0.23,0); robot.add(arm1);
-      let arm2 = arm1.clone(); arm2.position.set(0.15,0.23,0); robot.add(arm2);
-      robot.position.set(0,0,-0.7);
-      robot.userData.state = "stand";
+
+      let mat = new THREE.MeshPhongMaterial({ color: robotColor });
+
+      // Тіло
+      let body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.1), mat.clone());
+      body.position.y = 0.15;
+      body.name = "body";
+      robot.add(body);
+
+      // Голова
+      let head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), mat.clone());
+      head.position.y = 0.34;
+      head.name = "head";
+      robot.add(head);
+
+      // Ноги
+      let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.06), mat.clone());
+      leg1.position.set(-0.06, 0.02, 0);
+      leg1.name = "leg1";
+      robot.add(leg1);
+      let leg2 = leg1.clone();
+      leg2.position.set(0.06, 0.02, 0);
+      leg2.name = "leg2";
+      robot.add(leg2);
+
+      // Руки
+      let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.05), mat.clone());
+      arm1.position.set(-0.15, 0.23, 0);
+      arm1.name = "arm1";
+      robot.add(arm1);
+      let arm2 = arm1.clone();
+      arm2.position.set(0.15, 0.23, 0);
+      arm2.name = "arm2";
+      robot.add(arm2);
+
+      robot.position.set(0, 0, -0.7);
+      targetPos.copy(robot.position);
       scene.add(robot);
 
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-      light.position.set(0,1,0); scene.add(light);
+      // Світло
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.4);
+      light.position.set(0, 1, 0);
+      scene.add(light);
 
-      window.addEventListener("resize", ()=>{
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        camera.aspect = window.innerWidth/window.innerHeight;
-        camera.updateProjectionMatrix();
+      // --- Touch Events для свайпів ---
+      renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          dragging = true;
+        }
       });
+
+      renderer.domElement.addEventListener('touchend', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        if (!startX || !startY) return;
+        let endX = e.changedTouches[0].clientX;
+        let endY = e.changedTouches[0].clientY;
+        let dx = endX - startX;
+        let dy = endY - startY;
+        if (Math.abs(dx) < 25 && Math.abs(dy) < 25) return; // занадто короткий свайп
+        // Головний напрямок свайпу
+        if (Math.abs(dx) > Math.abs(dy)) {
+          if (dx > 0) moveRobot('right');
+          else moveRobot('left');
+        } else {
+          if (dy < 0) moveRobot('forward');
+          else moveRobot('backward');
+        }
+      });
+
+      // --- Tap для зміни кольору ---
+      renderer.domElement.addEventListener('click', (e) => {
+        // Вираховуємо, чи клік по роботу через Raycaster
+        let rect = renderer.domElement.getBoundingClientRect();
+        let x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        let y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        let mouse = new THREE.Vector2(x, y);
+        let raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObject(robot, true);
+        if (intersects.length > 0) {
+          robotColor = Math.random() * 0xffffff;
+          robot.traverse(child => {
+            if (child.isMesh) child.material.color.setHex(robotColor);
+          });
+          animateColorChange();
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    function moveRobot(direction) {
+      if (animating) return; // Чекаємо, поки анімація завершиться
+      let step = 0.18; // Розмір кроку
+      let tilt = 0.28; // Нахил для анімації
+
+      let oldPos = targetPos.clone();
+      switch (direction) {
+        case 'left':
+          targetPos.x -= step;
+          animateMove('left', oldPos, targetPos, tilt);
+          break;
+        case 'right':
+          targetPos.x += step;
+          animateMove('right', oldPos, targetPos, tilt);
+          break;
+        case 'forward':
+          targetPos.z -= step;
+          animateMove('forward', oldPos, targetPos, tilt);
+          break;
+        case 'backward':
+          targetPos.z += step;
+          animateMove('backward', oldPos, targetPos, tilt);
+          break;
+      }
+    }
+
+    function animateMove(dir, from, to, tilt) {
+      animating = true;
+      let duration = 340; // ms
+      let t0 = performance.now();
+      let robotStart = from.clone();
+      let robotEnd = to.clone();
+
+      let tiltAxis, tiltSign;
+      switch (dir) {
+        case 'left':     tiltAxis = 'z'; tiltSign = 1; break;
+        case 'right':    tiltAxis = 'z'; tiltSign = -1; break;
+        case 'forward':  tiltAxis = 'x'; tiltSign = -1; break;
+        case 'backward': tiltAxis = 'x'; tiltSign = 1; break;
+      }
+
+      function animFrame(now) {
+        let t = (now - t0) / duration;
+        if (t > 1) t = 1;
+        // Плавний рух
+        robot.position.lerpVectors(robotStart, robotEnd, t);
+        // Плавний нахил
+        robot.rotation[tiltAxis] = tiltSign * Math.sin(t * Math.PI) * tilt;
+        // Підстрибування
+        let bounce = Math.sin(t * Math.PI) * 0.07;
+        robot.position.y = 0.13 + bounce;
+
+        if (t < 1) {
+          renderer.setAnimationLoop(animFrame);
+        } else {
+          robot.position.copy(robotEnd);
+          robot.rotation.x = 0;
+          robot.rotation.z = 0;
+          robot.position.y = 0.13;
+          animating = false;
+          renderer.setAnimationLoop(render);
+        }
+      }
+      renderer.setAnimationLoop(animFrame);
+    }
+
+    function animateColorChange() {
+      let t0 = performance.now();
+      let duration = 230;
+      function animColor(now) {
+        let t = (now - t0) / duration;
+        if (t > 1) t = 1;
+        robot.rotation.y = Math.sin(t * Math.PI * 2) * 0.18;
+        if (t < 1) {
+          renderer.setAnimationLoop(animColor);
+        } else {
+          robot.rotation.y = 0;
+          renderer.setAnimationLoop(render);
+        }
+      }
+      renderer.setAnimationLoop(animColor);
     }
 
     function animate() {
-      renderer.setAnimationLoop(()=>{
-        // Анімація (наприклад, можна рухати ноги, якщо state ≠ "stand")
-        renderer.render(scene, camera);
-      });
+      renderer.setAnimationLoop(render);
     }
 
-    // === RUN ===
-    initThree();
-    initHandTracking();
-    animate();
+    function render() {
+      renderer.render(scene, camera);
+    }
   </script>
 </body>
 </html>
