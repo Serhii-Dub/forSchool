@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Безмаркерна AR - Car2</title>
+  <style>
+    html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+    body { overflow:hidden; }
+    canvas { display:block; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// Three.js basics
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera();
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// AR Button
+document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
+
+// Додаємо модель у стартову точку XR-камери
+let model = null;
+
+renderer.xr.addEventListener('sessionstart', () => {
+  if (!model) {
+    const loader = new GLTFLoader();
+    loader.load(
+      'car/car2.glb',
+      (gltf) => {
+        model = gltf.scene;
+
+        // Дістати стартову позицію та орієнтацію XR-камери
+        const xrCam = renderer.xr.getCamera(camera);
+        model.position.setFromMatrixPosition(xrCam.matrixWorld);
+        model.quaternion.setFromRotationMatrix(xrCam.matrixWorld);
+
+        // Масштабування
+        model.scale.set(0.02, 0.02, 0.02);
+
+        scene.add(model);
+      }
+    );
+  }
+});
+
+// Світло
+{
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.1);
+  scene.add(light);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(5, 10, 7);
+  scene.add(dirLight);
+}
+
+renderer.setAnimationLoop(() => {
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
