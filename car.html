@@ -5,27 +5,28 @@
   <title>WebXR AR — Модель Машини</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; overflow: hidden; }
-    .ar-button, .webxr-ar-button {
-      position: fixed !important;
-      left: 50% !important;
-      bottom: 40px !important;
-      transform: translateX(-50%) !important;
-      background: #26d0ce !important;
-      color: #fff !important;
-      border: none !important;
-      border-radius: 2em !important;
-      font-size: 2.1em !important;
-      padding: 1em 2.2em !important;
-      font-family: 'Segoe UI', Arial, sans-serif !important;
-      box-shadow: 0 4px 24px #26d0ce77, 0 1.5px 5px #4442 !important;
-      z-index: 99999 !important;
-      cursor: pointer !important;
-      transition: background 0.2s;
+    body { margin: 0; }
+    #placeholder {
+      background: linear-gradient(135deg, #f0f3fa 0%, #dde6f4 100%);
+      color: #232363;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0; left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-size: 2em;
+      z-index: 10;
+      text-align: center;
+      transition: opacity 0.3s;
     }
-    .ar-button:hover, .webxr-ar-button:hover {
-      background: #087ee0 !important;
-      color: #fff !important;
+    #placeholder img {
+      width: 120px;
+      margin-bottom: 24px;
+      opacity: 0.7;
     }
   </style>
   <script type="importmap">
@@ -38,6 +39,12 @@
   </script>
 </head>
 <body>
+  <!-- Простий плейсхолдер до запуску AR -->
+  <div id="placeholder">
+    <img src="https://cdn-icons-png.flaticon.com/512/1699/1699636.png" alt="AR" />
+    <div>Щоб почати AR, натисни кнопку нижче</div>
+    <small style="font-size: 0.6em; margin-top: 16px; color: #647199;">Дозволь доступ до камери.<br>Модель авто з'явиться у просторі!</small>
+  </div>
   <script type="module">
     import * as THREE from 'three';
     import { ARButton } from 'three/addons/webxr/ARButton.js';
@@ -62,19 +69,19 @@
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
 
+      // Стандартна AR-кнопка від three.js
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
       // Світло
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.2);
       scene.add(hemiLight);
-
-      // ARButton
-      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
       // Завантаження моделі
       const loader = new GLTFLoader();
       loader.load('car/car2.glb',
         function (gltf) {
           carModel = gltf.scene;
-          carModel.scale.set(2, 2, 2); // дуже великий розмір
+          carModel.scale.set(2, 2, 2); // Дуже великий розмір для надійності
           carModel.position.set(0, 1, -2);
           carModel.visible = false;
           scene.add(carModel);
@@ -89,12 +96,18 @@
     }
 
     function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Не міняємо розмір, якщо AR-сесія активна (щоб не було помилки)
+      if (!renderer.xr.isPresenting) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
     }
 
     renderer.xr.addEventListener('sessionstart', async () => {
+      // При старті AR — ховаємо плейсхолдер
+      const ph = document.getElementById('placeholder');
+      if (ph) ph.style.opacity = 0, setTimeout(()=>ph.remove(),300);
       const session = renderer.xr.getSession();
       try {
         const viewerRefSpace = await session.requestReferenceSpace('viewer');
