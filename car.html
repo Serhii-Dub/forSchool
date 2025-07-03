@@ -1,107 +1,117 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="utf-8">
-  <title>AR Автомобіль — Інформатика</title>
+  <meta charset="UTF-8">
+  <title>WebXR AR — Модель Машини</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
-    }
-  }
-  </script>
   <style>
-    html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+    body { margin: 0; overflow: hidden; }
   </style>
 </head>
 <body>
   <script type="module">
-    import * as THREE from 'three';
-    import { ARButton } from 'three/addons/webxr/ARButton.js';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/GLTFLoader.js';
+    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/ARButton.js';
 
     let camera, scene, renderer;
-    let car = null;
-    let reticle;
-    let hitTestSource = null;
-    let hitTestSourceRequested = false;
+    let carModel = null;
     let modelPlaced = false;
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
+    let hitTestSource = null;
+    let localSpace = null;
 
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera();
+    init();
+    animate();
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x222233, 2.5));
-    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+    function init() {
+      scene = new THREE.Scene();
 
-    // reticle — для hit-test
-    reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-    );
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      // Світло
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.2);
+      scene.add(hemiLight);
+
+      // AR-кнопка
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+      // Завантаження моделі (попередньо)
+      const loader = new GLTFLoader();
+      loader.load('car/car2.glb', function(gltf) {
+        carModel = gltf.scene;
+        carModel.visible = false;
+        scene.add(carModel);
+      });
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    renderer.xr.addEventListener('sessionstart', async () => {
+      const session = renderer.xr.getSession();
+      const viewerRefSpace = await session.requestReferenceSpace('viewer');
+      hitTestSource = await session.requestHitTestSource({ space: viewerRefSpace });
+      localSpace = await session.requestReferenceSpace('local');
+      modelPlaced = false;
+      if (carModel) carModel.visible = false;
+    });
+
+    renderer.xr.addEventListener('sessionend', () => {
+      hitTestSource = null;
+      localSpace = null;
+      modelPlaced = false;
+      if (carModel) carModel.visible = false;
+    });
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
 
     function render(timestamp, frame) {
-      if (frame && !modelPlaced) {
-        const referenceSpace = renderer.xr.getReferenceSpace();
-        const session = renderer.xr.getSession();
+      if (
+        renderer.xr.isPresenting &&
+        hitTestSource &&
+        frame &&
+        !modelPlaced &&
+        carModel
+      ) {
+        const referenceSpace = localSpace;
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
 
-        if (!hitTestSourceRequested) {
-          session.requestReferenceSpace('viewer').then((refSpace) => {
-            session.requestHitTestSource({ space: refSpace }).then((source) => {
-              hitTestSource = source;
-            });
-          });
-          session.addEventListener('end', () => {
-            hitTestSourceRequested = false;
-            hitTestSource = null;
-          });
-          hitTestSourceRequested = true;
-        }
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
 
-        if (hitTestSource) {
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-          if (hitTestResults.length > 0) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace);
-
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-
-            if (!modelPlaced) {
-              const loader = new GLTFLoader();
-              loader.load('car/car2.glb', gltf => {
-                car = gltf.scene;
-                car.scale.set(0.7, 0.7, 0.7);
-
-                car.position.setFromMatrixPosition(new THREE.Matrix4().fromArray(pose.transform.matrix));
-                car.quaternion.setFromRotationMatrix(new THREE.Matrix4().fromArray(pose.transform.matrix));
-
-                scene.add(car);
-                modelPlaced = true;
-                reticle.visible = false; // Ховаємо reticle після розміщення
-              });
-            }
-          } else {
-            reticle.visible = false;
-          }
+          // Ставимо модель у знайдену позицію й фіксуємо
+          carModel.position.set(
+            pose.transform.position.x,
+            pose.transform.position.y,
+            pose.transform.position.z
+          );
+          carModel.quaternion.fromArray([
+            pose.transform.orientation.x,
+            pose.transform.orientation.y,
+            pose.transform.orientation.z,
+            pose.transform.orientation.w
+          ]);
+          carModel.visible = true;
+          modelPlaced = true;
         }
       }
 
       renderer.render(scene, camera);
     }
-
-    renderer.setAnimationLoop(render);
   </script>
 </body>
 </html>
