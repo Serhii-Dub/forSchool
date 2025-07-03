@@ -2,154 +2,156 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>Жести для керування роботом</title>
-  <!-- Підключення Three.js -->
-  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
-  <!-- MediaPipe Hands -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <title>AR Робот з жестами</title>
   <style>
-    body { margin:0; overflow:hidden; background: #222;}
-    #canvas3d { position:fixed; top:0; left:0; width:100vw; height:100vh; }
+    html, body { margin:0; padding:0; overflow:hidden; background:#222;}
     #info {
       position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
       color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
-      text-shadow: 0 1px 8px #000c; font-size: 1.08em;
-      background: rgba(0,0,0,0.4); padding: 5px 0;
+      text-shadow: 0 1px 8px #000c;
+      font-size: 1.15em;
     }
     #video {
-      position:fixed; right:0; bottom:0; width:200px; opacity:0.13; z-index:3;
-      border-radius:18px;
-      pointer-events:none;
+      position: fixed; top:0; left:0; width:120px; height:90px; z-index:5; opacity:0.3; pointer-events:none;
     }
   </style>
 </head>
 <body>
   <div id="info">
-    👋 <b>Рухай рукою в камеру!</b><br>
-    <b>Вказівний палець → Вліво/Вправо/Вгору/Вниз = кроки робота</b><br>
-    <b>Відкрита долоня = стоїть</b> | <b>Кулак = зміна кольору</b>
+    <b>AR Робот – керування жестами:</b><br>
+    ✋ відкрита долоня — стоїть<br>
+    👊 кулак — зміна кольору<br>
+    (Розпізнання жестів через камеру)
   </div>
-  <video id="video" playsinline></video>
+  <video id="video" autoplay playsinline></video>
   <canvas id="canvas3d"></canvas>
-  <script>
-    // Three.js basic scene
-    let scene = new THREE.Scene();
-    let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 100);
-    camera.position.set(0,0.25,1.1);
-    let renderer = new THREE.WebGLRenderer({canvas: document.getElementById('canvas3d'), alpha:true, antialias:true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
 
-    // Simple robot
-    let robot = new THREE.Group();
-    let robotColor = 0x1ec8e7;
-    let mat = new THREE.MeshPhongMaterial({color:robotColor});
-    let body = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.3,0.1), mat.clone());
-    body.position.y = 0.13; robot.add(body);
-    let head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.12), mat.clone());
-    head.position.y = 0.31; robot.add(head);
-    let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.14,0.07), mat.clone());
-    leg1.position.set(-0.06,0.02,0); robot.add(leg1);
-    let leg2 = leg1.clone(); leg2.position.x = 0.06; robot.add(leg2);
-    let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.13,0.07), mat.clone());
-    arm1.position.set(-0.15,0.20,0); robot.add(arm1);
-    let arm2 = arm1.clone(); arm2.position.x = 0.15; robot.add(arm2);
+    // === MediaPipe Hands ===
+    import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
-    robot.position.set(0,0,0);
-    scene.add(robot);
+    let handLandmarker, video, robot, robotColor = 0x1ec8e7, isFist = false;
+    let scene, camera, renderer;
 
-    let light = new THREE.HemisphereLight(0xffffff, 0x222233, 1.7);
-    scene.add(light);
+    async function initHandTracking() {
+      handLandmarker = await HandLandmarker.createFromOptions(
+        await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'),
+        {numHands: 1, runningMode: "VIDEO"}
+      );
 
-    // Gesture logic
-    function setRobotColor(newColor) {
-      robot.traverse(c=>{
-        if (c.isMesh) c.material.color.setHex(newColor);
+      video = document.getElementById("video");
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then((stream) => {
+          video.srcObject = stream;
+          video.play();
+          requestAnimationFrame(trackHands);
+        });
+    }
+
+    function isOpenPalm(landmarks) {
+      // Відстань від зап’ястя до кінчика середнього пальця більша ніж у кулака
+      if (!landmarks) return false;
+      const wrist = landmarks[0], mid = landmarks[12];
+      const dist = Math.hypot(mid.x - wrist.x, mid.y - wrist.y);
+      // пальці прямі — кінчик середнього далеко від зап'ястя
+      return dist > 0.25 && isAllFingersOpen(landmarks);
+    }
+
+    function isFistGesture(landmarks) {
+      // Всі кінчики пальців близько до зап’ястя
+      if (!landmarks) return false;
+      let closed = 0;
+      [8,12,16,20].forEach(i => {
+        const tip = landmarks[i], wrist = landmarks[0];
+        if (Math.hypot(tip.x-wrist.x, tip.y-wrist.y)<0.12) closed++;
+      });
+      return closed >= 3;
+    }
+    function isAllFingersOpen(landmarks) {
+      // Перевірити чи всі пальці відкриті
+      if (!landmarks) return false;
+      let open = 0;
+      [8,12,16,20].forEach(i => {
+        const tip = landmarks[i], pip = landmarks[i-2];
+        if (tip.y < pip.y) open++;
+      });
+      return open >= 3;
+    }
+
+    async function trackHands() {
+      if (!video || video.readyState !== 4) {
+        requestAnimationFrame(trackHands);
+        return;
+      }
+      const results = handLandmarker.detectForVideo(video, performance.now());
+      let gesture = "none";
+      if (results.landmarks && results.landmarks.length > 0) {
+        const lm = results.landmarks[0];
+        if (isFistGesture(lm)) gesture = "fist";
+        else if (isOpenPalm(lm)) gesture = "palm";
+      }
+
+      // === Реакція на жести ===
+      if (gesture === "palm") {
+        robot.userData.state = "stand";
+      } else if (gesture === "fist" && !isFist) {
+        robotColor = Math.random()*0xffffff;
+        robot.traverse(child=>{if(child.isMesh) child.material.color.setHex(robotColor)});
+        isFist = true;
+      } else if (gesture !== "fist") {
+        isFist = false;
+      }
+      requestAnimationFrame(trackHands);
+    }
+
+    // === THREE.js сцена ===
+    function initThree() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 100);
+      camera.position.set(0,0.25,1.1);
+
+      renderer = new THREE.WebGLRenderer({canvas:document.getElementById("canvas3d"), alpha:true, antialias:true});
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      // Робот
+      robot = new THREE.Group();
+      let mat = new THREE.MeshPhongMaterial({color:robotColor});
+      let body = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.33,0.1), mat.clone());
+      body.position.y = 0.17; robot.add(body);
+      let head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.13), mat.clone());
+      head.position.y = 0.34; robot.add(head);
+      let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.18,0.06), mat.clone());
+      leg1.position.set(-0.06,0.04,0); robot.add(leg1);
+      let leg2 = leg1.clone(); leg2.position.set(0.06,0.04,0); robot.add(leg2);
+      let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.05), mat.clone());
+      arm1.position.set(-0.15,0.23,0); robot.add(arm1);
+      let arm2 = arm1.clone(); arm2.position.set(0.15,0.23,0); robot.add(arm2);
+      robot.position.set(0,0,-0.7);
+      robot.userData.state = "stand";
+      scene.add(robot);
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+      light.position.set(0,1,0); scene.add(light);
+
+      window.addEventListener("resize", ()=>{
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
       });
     }
 
-    // MediaPipe hands
-    const videoElement = document.getElementById('video');
-    let cameraM;
-    let lastGesture = "stop";
-    let lastColorChange = Date.now();
-
-    function getGesture(landmarks) {
-      // very basic: check finger states
-      if (!landmarks) return "stop";
-      let tip = (i) => landmarks[i];
-      let isUp = idx => tip(idx).y < tip(idx-2).y;
-      // open palm: all fingers up
-      let fingers = [8,12,16,20].map(i=> isUp(i));
-      if (fingers.every(x=>x)) return "stop";
-      // index only: direction
-      if (isUp(8)&& !isUp(12)&&!isUp(16)&&!isUp(20)) {
-        let dx = tip(8).x - tip(5).x;
-        let dy = tip(8).y - tip(5).y;
-        if (Math.abs(dx) > Math.abs(dy)) {
-          if (dx < -0.07) return "left";
-          if (dx > 0.07) return "right";
-        } else {
-          if (dy < -0.07) return "up";
-          if (dy > 0.07) return "down";
-        }
-      }
-      // fist (all down): color
-      if ([8,12,16,20].every(i=>!isUp(i))) return "color";
-      return "stop";
-    }
-
-    function onResults(results) {
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        let gesture = getGesture(results.multiHandLandmarks[0]);
-        if (gesture !== lastGesture) {
-          if (gesture==="left")    robot.position.x -= 0.09;
-          if (gesture==="right")   robot.position.x += 0.09;
-          if (gesture==="up")      robot.position.z -= 0.11;
-          if (gesture==="down")    robot.position.z += 0.11;
-          if (gesture==="color" && Date.now()-lastColorChange > 800) {
-            robotColor = Math.random()*0xffffff;
-            setRobotColor(robotColor|0);
-            lastColorChange = Date.now();
-          }
-          lastGesture = gesture;
-        }
-      } else {
-        lastGesture = "stop";
-      }
-    }
-
-    // MediaPipe setup
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 0,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.6
-    });
-    hands.onResults(onResults);
-
-    cameraM = new Camera(videoElement, {
-      onFrame: async () => { await hands.send({image: videoElement}); },
-      width: 480, height: 360
-    });
-    cameraM.start();
-
-    // Render loop
     function animate() {
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      renderer.setAnimationLoop(()=>{
+        // Анімація (наприклад, можна рухати ноги, якщо state ≠ "stand")
+        renderer.render(scene, camera);
+      });
     }
-    animate();
 
-    window.addEventListener('resize', ()=>{
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-    });
+    // === RUN ===
+    initThree();
+    initHandTracking();
+    animate();
   </script>
 </body>
 </html>
