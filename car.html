@@ -15,18 +15,25 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.136';
         import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
         import { ARButton } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/ARButton.js';
+        import { XRControllerModelFactory } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/XRControllerModelFactory.js';
 
         // Ініціалізація сцени
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            alpha: true 
+        });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.xr.enabled = true;
         document.body.appendChild(renderer.domElement);
         
-        // Додавання кнопки AR
-        document.body.appendChild(ARButton.createButton(renderer));
+        // Додавання кнопки AR з підтримкою hit-test
+        document.body.appendChild(ARButton.createButton(renderer, { 
+            requiredFeatures: ['hit-test'] 
+        }));
 
         // Освітлення
         const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -39,11 +46,11 @@
         let model;
 
         loader.load(
-            'https://serhii-dub.github.io/forSchool/car/car2.glb',
+            'https://serhii-dub.github.io/forSchool/car/car.glb',
             (gltf) => {
                 model = gltf.scene;
                 model.scale.set(0.5, 0.5, 0.5);
-                model.position.set(0, 0, -1);
+                model.visible = false; // Початково приховати модель
                 scene.add(model);
             },
             undefined,
@@ -52,17 +59,50 @@
 
         // Налаштування контролеру
         const controller = renderer.xr.getController(0);
-        controller.addEventListener('select', () => {
-            if (!model) return;
-            model.position.set(0, 0, -1).applyMatrix4(controller.matrixWorld);
-            model.rotation.setFromRotationMatrix(controller.matrixWorld);
-        });
+        controller.addEventListener('select', onSelect);
         scene.add(controller);
 
-        // Анімаційний цикл
-        renderer.setAnimationLoop(() => {
-            renderer.render(scene, camera);
+        // Додавання ретейнера для решітки
+        const reticle = new THREE.Mesh(
+            new THREE.RingGeometry(0.05, 0.1, 32).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial()
+        );
+        reticle.matrixAutoUpdate = false;
+        reticle.visible = false;
+        scene.add(reticle);
+
+        // Обробка початку сесії
+        renderer.xr.addEventListener('sessionstart', (event) => {
+            event.session.requestReferenceSpace('viewer').then((refSpace) => {
+                // Запит на виявлення поверхонь
+                event.session.requestHitTestSource({ space: refSpace }).then((hitTestSource) => {
+                    let hitTestSourceRef = hitTestSource;
+                    
+                    renderer.setAnimationLoop((timestamp, frame) => {
+                        if (frame && hitTestSourceRef) {
+                            const hitTestResults = frame.getHitTestResults(hitTestSourceRef);
+                            if (hitTestResults.length > 0) {
+                                const hit = hitTestResults[0];
+                                reticle.visible = true;
+                                reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
+                            } else {
+                                reticle.visible = false;
+                            }
+                        }
+                        renderer.render(scene, camera);
+                    });
+                });
+            });
         });
+
+        // Обробка вибору місця розміщення
+        function onSelect() {
+            if (reticle.visible && model) {
+                model.position.setFromMatrixPosition(reticle.matrix);
+                model.visible = true;
+                model.quaternion.setFromRotationMatrix(reticle.matrix);
+            }
+        }
 
         // Обробка зміни розміру вікна
         window.addEventListener('resize', () => {
