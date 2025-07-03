@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <title>AR Автомобіль — Інтерактивний перегляд</title>
+  <title>AR Автомобіль — Фіксована модель у просторі</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script type="importmap">
   {
@@ -23,47 +23,37 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     let camera, scene, renderer;
-    let controller;
     let car;
 
     function init() {
-      // Ініціалізація сцени
+      // Ініціалізація Three.js
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
 
-      // Рендерер
+      // Налаштування рендерера
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
 
-      // Світло
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 2);
-      light.position.set(0.5, 1, 0.25);
+      // Додаємо світло
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
       scene.add(light);
 
-      // AR-кнопка
-      document.body.appendChild(ARButton.createButton(renderer, { 
-        requiredFeatures: ['hit-test'] 
-      }));
+      // Кнопка AR
+      document.body.appendChild(ARButton.createButton(renderer));
 
-      // Контролер для взаємодії
-      controller = renderer.xr.getController(0);
-      scene.add(controller);
-
-      // Завантаження моделі при старті сесії
-      renderer.xr.addEventListener('sessionstart', () => {
-        const loader = new GLTFLoader();
-        loader.load('car/car2.glb', (gltf) => {
-          car = gltf.scene;
-          car.scale.set(0.7, 0.7, 0.7);
-          car.position.set(0, 0, -1.5); // На 1.5 метра перед камерою
-          scene.add(car);
-        });
+      // Завантажуємо модель одразу при старті
+      const loader = new GLTFLoader();
+      loader.load('car/car2.glb', (gltf) => {
+        car = gltf.scene;
+        car.scale.set(0.7, 0.7, 0.7);
+        car.position.set(0, 0, -2); // Фіксована позиція у світовому просторі
+        scene.add(car);
       });
 
-      // Анімаційний цикл
+      // Запускаємо анімаційний цикл
       renderer.setAnimationLoop(() => {
         renderer.render(scene, camera);
       });
