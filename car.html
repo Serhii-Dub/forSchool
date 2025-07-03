@@ -2,48 +2,52 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>Three.js WebXR AR — Три моделі</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Автомобілі — три моделі</title>
   <style>
-    body { margin:0; background:#111; color:#fff; }
-    #start-ar { position:fixed;top:18px;right:18px;z-index:10;padding:12px 24px;font-size:18px;background:#222;border:none;color:#fff;border-radius:8px; }
-    #info { position:fixed;bottom:20px;left:0;right:0;text-align:center;color:#fff; }
+    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
+    #info {
+      position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
+      color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
+      text-shadow: 0 1px 8px #000c;
+      font-size: 1.13em;
+      pointer-events: none;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
-  <button id="start-ar">Запустити AR</button>
-  <div id="info">Натисніть кнопку, потім — поверхню, щоб розмістити три машини.<br>WebXR працює на Android Chrome і iOS Safari (16.4+)</div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js"></script>
-  <script>
-    let camera, scene, renderer, controller, reticle, cars = [];
+  <div id="info">
+    <b>AR: Три машини з'являться поруч після вибору поверхні.</b><br>
+    WebXR працює лише на смартфоні у Chrome (Android) або Safari (iOS 16.4+)
+  </div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
 
-    document.getElementById('start-ar').onclick = () => {
-      document.getElementById('start-ar').style.display = 'none';
-      document.getElementById('info').style.display = 'none';
-      startAR();
-    };
+    let camera, scene, renderer, controller, reticle;
+    let cars = [];
+    let placed = false;
 
-    function startAR() {
+    init();
+    animate();
+
+    function init() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera();
 
-      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType('local');
       document.body.appendChild(renderer.domElement);
 
-      // WebXR AR button
       document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-      // Light
-      const light = new THREE.HemisphereLight(0xffffff, 0x444455, 1.2);
-      scene.add(light);
+      // Світло
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.3));
 
-      // Reticle — для визначення поверхні
+      // Reticle (кільце для позиції)
       const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI/2);
       const material = new THREE.MeshBasicMaterial({ color:0x00ff88 });
       reticle = new THREE.Mesh(geometry, material);
@@ -51,27 +55,27 @@
       reticle.visible = false;
       scene.add(reticle);
 
-      // Контролер для тапу
+      // Контролер для tap
       controller = renderer.xr.getController(0);
       controller.addEventListener('select', onSelect);
       scene.add(controller);
 
-      // HitTest
+      // Для hit-test
       let hitTestSource = null;
       let hitTestSourceRequested = false;
 
-      renderer.setAnimationLoop(function (timestamp, frame) {
+      renderer.setAnimationLoop((timestamp, frame) => {
         if (frame) {
           const referenceSpace = renderer.xr.getReferenceSpace();
           const session = renderer.xr.getSession();
 
           if (!hitTestSourceRequested) {
-            session.requestReferenceSpace('viewer').then(function (refSpace) {
-              session.requestHitTestSource({ space: refSpace }).then(function (source) {
+            session.requestReferenceSpace('viewer').then(refSpace => {
+              session.requestHitTestSource({ space: refSpace }).then(source => {
                 hitTestSource = source;
               });
             });
-            session.addEventListener('end', function () {
+            session.addEventListener('end', () => {
               hitTestSourceRequested = false;
               hitTestSource = null;
             });
@@ -93,30 +97,36 @@
       });
     }
 
-    // Коли тапаєш — розміщуються всі три машини поруч
+    // Після tap — ставимо три моделі поряд
     function onSelect() {
-      if (reticle.visible && cars.length === 0) {
-        const models = [
-          'car/car1.glb',
-          'car/car2.glb',
-          'car/car3.glb'
-        ];
-        const loader = new THREE.GLTFLoader();
+      if (!reticle.visible || placed) return;
+      placed = true;
 
-        models.forEach((url, i) => {
-          loader.load(url, function(gltf) {
-            let model = gltf.scene;
-            // Три машини поруч: з інтервалом 0.8 метра
-            model.position.setFromMatrixPosition(reticle.matrix);
-            model.position.x += (i - 1) * 0.8; // -0.8, 0, +0.8
-            model.scale.set(0.7,0.7,0.7);
-            scene.add(model);
-            cars.push(model);
-          }, undefined, function(error){
-            alert('Не вдалося завантажити: ' + url);
-          });
+      const loader = new GLTFLoader();
+      const carsList = [
+        'car/car1.glb',
+        'car/car2.glb',
+        'car/car3.glb'
+      ];
+
+      carsList.forEach((url, i) => {
+        loader.load(url, gltf => {
+          let car = gltf.scene;
+          car.position.setFromMatrixPosition(reticle.matrix);
+          car.position.x += (i - 1) * 0.7; // -0.7, 0, +0.7 (три машини в ряд)
+          car.scale.set(0.7, 0.7, 0.7);
+          scene.add(car);
+          cars.push(car);
+        }, undefined, e => {
+          alert("Не вдалося завантажити: " + url);
         });
-      }
+      });
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
     }
   </script>
 </body>
