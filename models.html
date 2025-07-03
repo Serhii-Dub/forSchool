@@ -48,7 +48,7 @@
     loader.load('models/model.glb', function(gltf) {
       const modelLeft = gltf.scene;
       modelLeft.position.set(-3.5, 0, 0); // ліворуч
-      modelLeft.scale.set(0.2, 0.2, 0.2); // зменшуємо модель, якщо треба ще менше — став 0.2
+      modelLeft.scale.set(0.5, 0.5, 0.5); // зменшуємо модель, якщо треба ще менше — став 0.2
       scene.add(modelLeft);
     }, undefined, function(e) {
       console.error('Не вдалося завантажити model.glb', e);
@@ -58,7 +58,7 @@
     loader.load('models/model2.glb', function(gltf) {
       const modelRight = gltf.scene;
       modelRight.position.set(-0.5, 0, -27); // праворуч і трохи вперед
-      modelRight.scale.set(10.5, 10.5, 10.5);
+      modelRight.scale.set(0.5, 0.5, 0.5);
       scene.add(modelRight);
     }, undefined, function(e) {
       console.error('Не вдалося завантажити model2.glb', e);
