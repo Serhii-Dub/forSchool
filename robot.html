@@ -2,14 +2,14 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Робот — свайпи та анімації</title>
+  <title>AR Робот з 3D-кнопками</title>
   <style>
     html, body { margin:0; padding:0; overflow: hidden; background: #222;}
     #info {
       position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
       color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
       text-shadow: 0 1px 8px #000c;
-      font-size: 1.13em;
+      font-size: 1.11em;
       pointer-events: none;
       user-select: none;
     }
@@ -17,20 +17,20 @@
 </head>
 <body>
   <div id="info">
-    <b>AR Робот – керування свайпами:</b><br>
-    Свайп вгору — вперед | вниз — назад | вліво — вліво | вправо — вправо<br>
-    Тап по роботу — зміна кольору<br>
-    (WebXR AR: камера відкривається тільки в AR-режимі)
+    <b>AR Робот із 3D-кнопками</b><br>
+    Натискай кнопки у повітрі!<br>
+    Стрілки — рух, квадрат — змінити колір
   </div>
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
     import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
 
     let camera, scene, renderer;
-    let robot, robotColor = 0x1ec8e7;
-    let startX = null, startY = null, dragging = false;
+    let robot, robotColor = 0x1ec8e7, targetPos = new THREE.Vector3();
     let animating = false;
-    let targetPos = new THREE.Vector3();
+
+    let buttons = [];
+    let buttonActions = [];
 
     init();
     animate();
@@ -52,37 +52,19 @@
 
       let mat = new THREE.MeshPhongMaterial({ color: robotColor });
 
-      // Тіло
       let body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.1), mat.clone());
-      body.position.y = 0.15;
-      body.name = "body";
-      robot.add(body);
+      body.position.y = 0.15; robot.add(body);
 
-      // Голова
       let head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), mat.clone());
-      head.position.y = 0.34;
-      head.name = "head";
-      robot.add(head);
+      head.position.y = 0.34; robot.add(head);
 
-      // Ноги
       let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.06), mat.clone());
-      leg1.position.set(-0.06, 0.02, 0);
-      leg1.name = "leg1";
-      robot.add(leg1);
-      let leg2 = leg1.clone();
-      leg2.position.set(0.06, 0.02, 0);
-      leg2.name = "leg2";
-      robot.add(leg2);
+      leg1.position.set(-0.06, 0.02, 0); robot.add(leg1);
+      let leg2 = leg1.clone(); leg2.position.set(0.06, 0.02, 0); robot.add(leg2);
 
-      // Руки
       let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.05), mat.clone());
-      arm1.position.set(-0.15, 0.23, 0);
-      arm1.name = "arm1";
-      robot.add(arm1);
-      let arm2 = arm1.clone();
-      arm2.position.set(0.15, 0.23, 0);
-      arm2.name = "arm2";
-      robot.add(arm2);
+      arm1.position.set(-0.15, 0.23, 0); robot.add(arm1);
+      let arm2 = arm1.clone(); arm2.position.set(0.15, 0.23, 0); robot.add(arm2);
 
       robot.position.set(0, 0, -0.7);
       targetPos.copy(robot.position);
@@ -93,49 +75,43 @@
       light.position.set(0, 1, 0);
       scene.add(light);
 
-      // --- Touch Events для свайпів ---
-      renderer.domElement.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-          startX = e.touches[0].clientX;
-          startY = e.touches[0].clientY;
-          dragging = true;
-        }
-      });
+      // --- 3D кнопки ---
+      add3DButtons();
 
-      renderer.domElement.addEventListener('touchend', (e) => {
-        if (!dragging) return;
-        dragging = false;
-        if (!startX || !startY) return;
-        let endX = e.changedTouches[0].clientX;
-        let endY = e.changedTouches[0].clientY;
-        let dx = endX - startX;
-        let dy = endY - startY;
-        if (Math.abs(dx) < 25 && Math.abs(dy) < 25) return; // занадто короткий свайп
-        // Головний напрямок свайпу
-        if (Math.abs(dx) > Math.abs(dy)) {
-          if (dx > 0) moveRobot('right');
-          else moveRobot('left');
-        } else {
-          if (dy < 0) moveRobot('forward');
-          else moveRobot('backward');
-        }
-      });
+      // --- XR select (тап у AR) ---
+      renderer.xr.addEventListener('select', (event) => {
+        const session = renderer.xr.getSession();
+        const xrFrame = event.frame;
+        const inputSource = event.inputSource;
+        const refSpace = renderer.xr.getReferenceSpace();
 
-      // --- Tap для зміни кольору ---
-      renderer.domElement.addEventListener('click', (e) => {
-        // Вираховуємо, чи клік по роботу через Raycaster
-        let rect = renderer.domElement.getBoundingClientRect();
-        let x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        let y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        let mouse = new THREE.Vector2(x, y);
-        let raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        let intersects = raycaster.intersectObject(robot, true);
+        if (!inputSource.targetRaySpace) return;
+        const ray = xrFrame.getPose(inputSource.targetRaySpace, refSpace);
+        if (!ray) return;
+
+        // Побудувати рейкастер по погляду/тапу користувача у AR
+        const raycaster = new THREE.Raycaster();
+        const direction = new THREE.Vector3(ray.transform.matrix[8], ray.transform.matrix[9], ray.transform.matrix[10]);
+        const origin = new THREE.Vector3(ray.transform.position.x, ray.transform.position.y, ray.transform.position.z);
+        raycaster.set(origin, direction.negate()); // напрямок вперед
+
+        // Кнопки: перевірити попадання
+        const intersects = raycaster.intersectObjects(buttons, true);
         if (intersects.length > 0) {
+          let btn = intersects[0].object;
+          let idx = buttons.indexOf(btn);
+          if (idx !== -1) buttonActions[idx]();
+          // анімація натиснутої кнопки:
+          btn.scale.set(1.2, 1.2, 1.2);
+          setTimeout(()=>btn.scale.set(1,1,1), 180);
+          return;
+        }
+
+        // Робот: зміна кольору (якщо тап по тілу)
+        const robotIntersects = raycaster.intersectObject(robot, true);
+        if (robotIntersects.length > 0) {
           robotColor = Math.random() * 0xffffff;
-          robot.traverse(child => {
-            if (child.isMesh) child.material.color.setHex(robotColor);
-          });
+          robot.traverse(child => { if (child.isMesh) child.material.color.setHex(robotColor); });
           animateColorChange();
         }
       });
@@ -145,35 +121,80 @@
       });
     }
 
-    function moveRobot(direction) {
-      if (animating) return; // Чекаємо, поки анімація завершиться
-      let step = 0.18; // Розмір кроку
-      let tilt = 0.28; // Нахил для анімації
-
-      let oldPos = targetPos.clone();
-      switch (direction) {
-        case 'left':
-          targetPos.x -= step;
-          animateMove('left', oldPos, targetPos, tilt);
-          break;
-        case 'right':
-          targetPos.x += step;
-          animateMove('right', oldPos, targetPos, tilt);
-          break;
-        case 'forward':
-          targetPos.z -= step;
-          animateMove('forward', oldPos, targetPos, tilt);
-          break;
-        case 'backward':
-          targetPos.z += step;
-          animateMove('backward', oldPos, targetPos, tilt);
-          break;
+    function add3DButtons() {
+      // Позначення стрілок (текстури можна свої)
+      function makeArrow(color, rot) {
+        const shape = new THREE.Shape();
+        shape.moveTo(-0.03, -0.03); shape.lineTo(0.03, -0.03); shape.lineTo(0.03, 0.03); shape.lineTo(0.01, 0.03);
+        shape.lineTo(0.01, 0.055); shape.lineTo(-0.01, 0.055); shape.lineTo(-0.01, 0.03);
+        shape.lineTo(-0.03, 0.03); shape.lineTo(-0.03, -0.03);
+        const geom = new THREE.ExtrudeGeometry(shape, { depth: 0.01, bevelEnabled: false });
+        const mat = new THREE.MeshPhongMaterial({ color, shininess: 60 });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.rotation.z = rot;
+        return mesh;
       }
+      function makeButton(color = 0xffdd33) {
+        const geom = new THREE.BoxGeometry(0.055, 0.055, 0.02);
+        const mat = new THREE.MeshPhongMaterial({ color, shininess: 50 });
+        return new THREE.Mesh(geom, mat);
+      }
+
+      // Вперед
+      let btnFwd = makeArrow(0x37e400, 0); // зелена ↑
+      btnFwd.position.set(0, 0.16, -0.32);
+      buttons.push(btnFwd);
+      buttonActions.push(()=>moveRobot('forward'));
+      scene.add(btnFwd);
+
+      // Назад
+      let btnBack = makeArrow(0xfd5555, Math.PI); // червона ↓
+      btnBack.position.set(0, 0.16, -0.5);
+      buttons.push(btnBack);
+      buttonActions.push(()=>moveRobot('backward'));
+      scene.add(btnBack);
+
+      // Вліво
+      let btnLeft = makeArrow(0x3399ff, -Math.PI/2); // синя ←
+      btnLeft.position.set(-0.10, 0.16, -0.41);
+      buttons.push(btnLeft);
+      buttonActions.push(()=>moveRobot('left'));
+      scene.add(btnLeft);
+
+      // Вправо
+      let btnRight = makeArrow(0x3399ff, Math.PI/2); // синя →
+      btnRight.position.set(0.10, 0.16, -0.41);
+      buttons.push(btnRight);
+      buttonActions.push(()=>moveRobot('right'));
+      scene.add(btnRight);
+
+      // Колір
+      let btnColor = makeButton(0xffdd33); // жовтий квадрат
+      btnColor.position.set(0, 0.24, -0.41);
+      buttons.push(btnColor);
+      buttonActions.push(()=>{
+        robotColor = Math.random() * 0xffffff;
+        robot.traverse(child => { if (child.isMesh) child.material.color.setHex(robotColor); });
+        animateColorChange();
+      });
+      scene.add(btnColor);
     }
 
+    function moveRobot(direction) {
+      if (animating) return;
+      let step = 0.18;
+      let tilt = 0.28;
+      let oldPos = targetPos.clone();
+      switch (direction) {
+        case 'left':     targetPos.x -= step; animateMove('left', oldPos, targetPos, tilt); break;
+        case 'right':    targetPos.x += step; animateMove('right', oldPos, targetPos, tilt); break;
+        case 'forward':  targetPos.z -= step; animateMove('forward', oldPos, targetPos, tilt); break;
+        case 'backward': targetPos.z += step; animateMove('backward', oldPos, targetPos, tilt); break;
+      }
+    }
     function animateMove(dir, from, to, tilt) {
       animating = true;
-      let duration = 340; // ms
+      let duration = 340;
       let t0 = performance.now();
       let robotStart = from.clone();
       let robotEnd = to.clone();
@@ -189,20 +210,14 @@
       function animFrame(now) {
         let t = (now - t0) / duration;
         if (t > 1) t = 1;
-        // Плавний рух
         robot.position.lerpVectors(robotStart, robotEnd, t);
-        // Плавний нахил
         robot.rotation[tiltAxis] = tiltSign * Math.sin(t * Math.PI) * tilt;
-        // Підстрибування
         let bounce = Math.sin(t * Math.PI) * 0.07;
         robot.position.y = 0.13 + bounce;
-
-        if (t < 1) {
-          renderer.setAnimationLoop(animFrame);
-        } else {
+        if (t < 1) renderer.setAnimationLoop(animFrame);
+        else {
           robot.position.copy(robotEnd);
-          robot.rotation.x = 0;
-          robot.rotation.z = 0;
+          robot.rotation.x = 0; robot.rotation.z = 0;
           robot.position.y = 0.13;
           animating = false;
           renderer.setAnimationLoop(render);
@@ -210,7 +225,6 @@
       }
       renderer.setAnimationLoop(animFrame);
     }
-
     function animateColorChange() {
       let t0 = performance.now();
       let duration = 230;
@@ -218,20 +232,17 @@
         let t = (now - t0) / duration;
         if (t > 1) t = 1;
         robot.rotation.y = Math.sin(t * Math.PI * 2) * 0.18;
-        if (t < 1) {
-          renderer.setAnimationLoop(animColor);
-        } else {
+        if (t < 1) renderer.setAnimationLoop(animColor);
+        else {
           robot.rotation.y = 0;
           renderer.setAnimationLoop(render);
         }
       }
       renderer.setAnimationLoop(animColor);
     }
-
     function animate() {
       renderer.setAnimationLoop(render);
     }
-
     function render() {
       renderer.render(scene, camera);
     }
