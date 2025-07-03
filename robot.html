@@ -2,139 +2,152 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Робот - рух і колір</title>
+  <title>Жести для керування роботом</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
   <style>
-    html, body { margin:0; padding:0; overflow: hidden; background: #222;}
+    body { margin:0; overflow:hidden; background: #222;}
+    #canvas3d { position:fixed; top:0; left:0; width:100vw; height:100vh; }
     #info {
       position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
       color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
-      text-shadow: 0 1px 8px #000c;
-      font-size: 1.14em;
+      text-shadow: 0 1px 8px #000c; font-size: 1.08em;
+      background: rgba(0,0,0,0.4); padding: 5px 0;
+    }
+    #video {
+      position:fixed; right:0; bottom:0; width:200px; opacity:0.13; z-index:3;
+      border-radius:18px;
+      pointer-events:none;
     }
   </style>
 </head>
 <body>
   <div id="info">
-    👋 <b>AR Робот</b>: <br>
-    - Свайп ліво/право: рухати робота <br>
-    - Тап по роботу: змінити колір <br>
-    (Жестове керування додам — якщо треба прямо розпізнавання рукою)
+    👋 <b>Рухай рукою в камеру!</b><br>
+    <b>Вказівний палець → Вліво/Вправо/Вгору/Вниз = кроки робота</b><br>
+    <b>Відкрита долоня = стоїть</b> | <b>Кулак = зміна кольору</b>
   </div>
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
+  <video id="video" playsinline></video>
+  <canvas id="canvas3d"></canvas>
+  <script>
+    // Three.js basic scene
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 100);
+    camera.position.set(0,0.25,1.1);
+    let renderer = new THREE.WebGLRenderer({canvas: document.getElementById('canvas3d'), alpha:true, antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
-    let camera, scene, renderer;
-    let robot;
-    let controller;
+    // Simple robot
+    let robot = new THREE.Group();
     let robotColor = 0x1ec8e7;
+    let mat = new THREE.MeshPhongMaterial({color:robotColor});
+    let body = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.3,0.1), mat.clone());
+    body.position.y = 0.13; robot.add(body);
+    let head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.12), mat.clone());
+    head.position.y = 0.31; robot.add(head);
+    let leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.14,0.07), mat.clone());
+    leg1.position.set(-0.06,0.02,0); robot.add(leg1);
+    let leg2 = leg1.clone(); leg2.position.x = 0.06; robot.add(leg2);
+    let arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.13,0.07), mat.clone());
+    arm1.position.set(-0.15,0.20,0); robot.add(arm1);
+    let arm2 = arm1.clone(); arm2.position.x = 0.15; robot.add(arm2);
 
-    let startX = null, dragging = false;
+    robot.position.set(0,0,0);
+    scene.add(robot);
 
-    init();
+    let light = new THREE.HemisphereLight(0xffffff, 0x222233, 1.7);
+    scene.add(light);
+
+    // Gesture logic
+    function setRobotColor(newColor) {
+      robot.traverse(c=>{
+        if (c.isMesh) c.material.color.setHex(newColor);
+      });
+    }
+
+    // MediaPipe hands
+    const videoElement = document.getElementById('video');
+    let cameraM;
+    let lastGesture = "stop";
+    let lastColorChange = Date.now();
+
+    function getGesture(landmarks) {
+      // very basic: check finger states
+      if (!landmarks) return "stop";
+      let tip = (i) => landmarks[i];
+      let isUp = idx => tip(idx).y < tip(idx-2).y;
+      // open palm: all fingers up
+      let fingers = [8,12,16,20].map(i=> isUp(i));
+      if (fingers.every(x=>x)) return "stop";
+      // index only: direction
+      if (isUp(8)&& !isUp(12)&&!isUp(16)&&!isUp(20)) {
+        let dx = tip(8).x - tip(5).x;
+        let dy = tip(8).y - tip(5).y;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          if (dx < -0.07) return "left";
+          if (dx > 0.07) return "right";
+        } else {
+          if (dy < -0.07) return "up";
+          if (dy > 0.07) return "down";
+        }
+      }
+      // fist (all down): color
+      if ([8,12,16,20].every(i=>!isUp(i))) return "color";
+      return "stop";
+    }
+
+    function onResults(results) {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        let gesture = getGesture(results.multiHandLandmarks[0]);
+        if (gesture !== lastGesture) {
+          if (gesture==="left")    robot.position.x -= 0.09;
+          if (gesture==="right")   robot.position.x += 0.09;
+          if (gesture==="up")      robot.position.z -= 0.11;
+          if (gesture==="down")    robot.position.z += 0.11;
+          if (gesture==="color" && Date.now()-lastColorChange > 800) {
+            robotColor = Math.random()*0xffffff;
+            setRobotColor(robotColor|0);
+            lastColorChange = Date.now();
+          }
+          lastGesture = gesture;
+        }
+      } else {
+        lastGesture = "stop";
+      }
+    }
+
+    // MediaPipe setup
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 0,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.6
+    });
+    hands.onResults(onResults);
+
+    cameraM = new Camera(videoElement, {
+      onFrame: async () => { await hands.send({image: videoElement}); },
+      width: 480, height: 360
+    });
+    cameraM.start();
+
+    // Render loop
+    function animate() {
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
     animate();
 
-    function init() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera();
-
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
+    window.addEventListener('resize', ()=>{
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-
-      // AR Button
-      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
-
-      // Робот з примітивів
-      robot = new THREE.Group();
-
-      // Тіло
-      let body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.3, 0.1),
-        new THREE.MeshPhongMaterial({ color: robotColor })
-      );
-      body.position.y = 0.15;
-      robot.add(body);
-
-      // Голова
-      let head = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 0.12, 0.12),
-        new THREE.MeshPhongMaterial({ color: robotColor })
-      );
-      head.position.y = 0.34;
-      robot.add(head);
-
-      // Ноги
-      let leg1 = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.18, 0.06),
-        new THREE.MeshPhongMaterial({ color: robotColor })
-      );
-      leg1.position.set(-0.06, 0.02, 0);
-      robot.add(leg1);
-      let leg2 = leg1.clone();
-      leg2.position.set(0.06, 0.02, 0);
-      robot.add(leg2);
-
-      // Руки
-      let arm1 = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.16, 0.05),
-        new THREE.MeshPhongMaterial({ color: robotColor })
-      );
-      arm1.position.set(-0.15, 0.23, 0);
-      robot.add(arm1);
-      let arm2 = arm1.clone();
-      arm2.position.set(0.15, 0.23, 0);
-      robot.add(arm2);
-
-      robot.position.set(0, 0, -0.7);
-      scene.add(robot);
-
-      // Світло
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.4);
-      light.position.set(0, 1, 0);
-      scene.add(light);
-
-      // Свайп для руху робота
-      renderer.domElement.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-          startX = e.touches[0].clientX;
-          dragging = true;
-        }
-      });
-      renderer.domElement.addEventListener('touchmove', (e) => {
-        if (!dragging) return;
-        let dx = e.touches[0].clientX - startX;
-        if (Math.abs(dx) > 30) {
-          robot.position.x += dx / 400;
-          startX = e.touches[0].clientX;
-        }
-      });
-      renderer.domElement.addEventListener('touchend', (e) => {
-        dragging = false;
-      });
-
-      // Тап по роботу для зміни кольору
-      renderer.domElement.addEventListener('click', (e) => {
-        robotColor = Math.random() * 0xffffff;
-        robot.traverse(child => {
-          if (child.isMesh) child.material.color.setHex(robotColor);
-        });
-      });
-
-      window.addEventListener('resize', () => {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    }
-
-    function animate() {
-      renderer.setAnimationLoop(render);
-    }
-
-    function render() {
-      renderer.render(scene, camera);
-    }
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
   </script>
 </body>
 </html>
