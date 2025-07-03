@@ -1,80 +1,75 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>AR Машина</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
-      }
-    }
-  </script>
+    <meta charset="utf-8">
+    <title>AR Car</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+        }
+    </style>
 </head>
 <body>
-  <script type="module">
-    import * as THREE from 'three';
-    import { ARButton } from 'three/addons/webxr/ARButton.js';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.136';
+        import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
+        import { ARButton } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/ARButton.js';
 
-    let scene = new THREE.Scene();
-    let camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-    let renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
+        // Ініціалізація сцени
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        // Додавання кнопки AR
+        document.body.appendChild(ARButton.createButton(renderer));
 
-    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+        // Освітлення
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.2));
+        // Завантаження моделі
+        const loader = new GLTFLoader();
+        let model;
 
-    let carModel = null, modelPlaced = false, hitTestSource = null, localSpace = null;
+        loader.load(
+            'https://serhii-dub.github.io/forSchool/car/car2.glb',
+            (gltf) => {
+                model = gltf.scene;
+                model.scale.set(0.5, 0.5, 0.5);
+                model.position.set(0, 0, -1);
+                scene.add(model);
+            },
+            undefined,
+            (error) => console.error(error)
+        );
 
-    new GLTFLoader().load('car/car2.glb', gltf => {
-      carModel = gltf.scene;
-      carModel.scale.set(2, 2, 2); // змінюй за потребою
-      carModel.visible = false;
-      scene.add(carModel);
-    });
+        // Налаштування контролеру
+        const controller = renderer.xr.getController(0);
+        controller.addEventListener('select', () => {
+            if (!model) return;
+            model.position.set(0, 0, -1).applyMatrix4(controller.matrixWorld);
+            model.rotation.setFromRotationMatrix(controller.matrixWorld);
+        });
+        scene.add(controller);
 
-    renderer.xr.addEventListener('sessionstart', async () => {
-      let session = renderer.xr.getSession();
-      let viewerSpace = await session.requestReferenceSpace('viewer');
-      hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-      localSpace = await session.requestReferenceSpace('local');
-      modelPlaced = false;
-      if (carModel) carModel.visible = false;
-    });
+        // Анімаційний цикл
+        renderer.setAnimationLoop(() => {
+            renderer.render(scene, camera);
+        });
 
-    renderer.xr.addEventListener('sessionend', () => {
-      hitTestSource = null; localSpace = null; modelPlaced = false;
-      if (carModel) carModel.visible = false;
-    });
-
-    renderer.setAnimationLoop((_, frame) => {
-      if (renderer.xr.isPresenting && hitTestSource && frame && !modelPlaced && carModel) {
-        let results = frame.getHitTestResults(hitTestSource);
-        if (results.length > 0) {
-          let pose = results[0].getPose(localSpace);
-          carModel.position.set(
-            pose.transform.position.x,
-            pose.transform.position.y + 0.2, // піднімаємо над підлогою
-            pose.transform.position.z
-          );
-          carModel.quaternion.set(
-            pose.transform.orientation.x,
-            pose.transform.orientation.y,
-            pose.transform.orientation.z,
-            pose.transform.orientation.w
-          );
-          carModel.visible = true;
-          modelPlaced = true;
-        }
-      }
-      renderer.render(scene, camera);
-    });
-  </script>
+        // Обробка зміни розміру вікна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
