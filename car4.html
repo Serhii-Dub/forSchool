@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <title>AR Автомобіль — Інформатика</title>
+  <title>AR Автомобілі — Інформатика</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script type="importmap">
   {
@@ -14,16 +14,24 @@
   </script>
   <style>
     html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+    #desc {
+      position:absolute; top:30px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.5); color:#fff; font-size:1.2em; padding:1em 2em; border-radius:1em; z-index:11;
+    }
   </style>
 </head>
 <body>
+  <div id="desc">
+    <b>Віртуальні автомобілі у доповненій реальності</b><br>
+    Натисніть AR-кнопку внизу для запуску.
+  </div>
   <script type="module">
     import * as THREE from 'three';
     import { ARButton } from 'three/addons/webxr/ARButton.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     let camera, scene, renderer;
-    let car4;
+    let car4, car2;
 
     function startAR() {
       renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
@@ -41,7 +49,7 @@
       // AR-кнопка (залишається!)
       document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
 
-      // Додаємо МОДЕЛЬ car4.glb тільки після старту XR-сесії!
+      // Додаємо моделі тільки після старту XR-сесії
       renderer.xr.addEventListener('sessionstart', () => {
         const loader = new GLTFLoader();
 
@@ -50,6 +58,13 @@
           car4.scale.set(0.02, 0.02, 0.02);
           car4.position.set(-3.5, 0, -2.5);  // 1.2 м попереду
           scene.add(car4);
+        });
+
+        loader.load('car/car2.glb', gltf => {
+          car2 = gltf.scene;
+          car2.scale.set(1, 1, 1);
+          car2.position.set(0.5, 0, -1.0);  // праворуч і трохи ближче
+          scene.add(car2);
         });
       });
 
