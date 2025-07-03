@@ -6,6 +6,7 @@
   <style>body { margin:0; overflow:hidden; }</style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.min.js"></script>
+  <!-- Ось цей скрипт! -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/webxr/ARButton.min.js"></script>
 </head>
 <body>
@@ -13,7 +14,6 @@
   let camera, scene, renderer;
 
   scene = new THREE.Scene();
-
   camera = new THREE.PerspectiveCamera();
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -21,6 +21,7 @@
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
+  // Ось тут точно вже є ARButton!
   document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
   let reticle, controller, carModelLoaded = false;
