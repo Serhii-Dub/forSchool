@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <title>AR Автомобіль - Фіксований у просторі</title>
+  <title>AR Автомобіль — Інформатика</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script type="importmap">
   {
@@ -23,57 +23,85 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     let camera, scene, renderer;
-    let car;
+    let car = null;
+    let reticle;
+    let hitTestSource = null;
+    let hitTestSourceRequested = false;
+    let modelPlaced = false;
 
-    function init() {
-      // 1. Налаштування сцени
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-      // 2. Рендерер з підтримкою WebXR
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera();
 
-      // 3. Додаємо світло (як у робота)
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.4);
-      light.position.set(0, 1, 0);
-      scene.add(light);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x222233, 2.5));
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-      // 4. Кнопка AR (без hit-test)
-      document.body.appendChild(ARButton.createButton(renderer));
+    // reticle — для hit-test
+    reticle = new THREE.Mesh(
+      new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+    );
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
 
-      // 5. Завантажуємо модель авто
-      const loader = new GLTFLoader();
-      loader.load('car/car2.glb', (gltf) => {
-        car = gltf.scene;
-        
-        // Налаштування як у робота:
-        car.scale.set(0.5, 0.5, 0.5); // Менший масштаб
-        car.position.set(0, -0.3, -0.8); // Нижче та ближче
-        car.rotation.y = Math.PI; // Повернути на 180°
-        
-        scene.add(car);
-      });
+    function render(timestamp, frame) {
+      if (frame && !modelPlaced) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const session = renderer.xr.getSession();
 
-      // 6. Реакція на зміну розміру
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
+        if (!hitTestSourceRequested) {
+          session.requestReferenceSpace('viewer').then((refSpace) => {
+            session.requestHitTestSource({ space: refSpace }).then((source) => {
+              hitTestSource = source;
+            });
+          });
+          session.addEventListener('end', () => {
+            hitTestSourceRequested = false;
+            hitTestSource = null;
+          });
+          hitTestSourceRequested = true;
+        }
 
-      // 7. Запуск анімації
-      renderer.setAnimationLoop(render);
-    }
+        if (hitTestSource) {
+          const hitTestResults = frame.getHitTestResults(hitTestSource);
 
-    function render() {
+          if (hitTestResults.length > 0) {
+            const hit = hitTestResults[0];
+            const pose = hit.getPose(referenceSpace);
+
+            reticle.visible = true;
+            reticle.matrix.fromArray(pose.transform.matrix);
+
+            if (!modelPlaced) {
+              const loader = new GLTFLoader();
+              loader.load('car/car2.glb', gltf => {
+                car = gltf.scene;
+                car.scale.set(0.7, 0.7, 0.7);
+
+                car.position.setFromMatrixPosition(new THREE.Matrix4().fromArray(pose.transform.matrix));
+                car.quaternion.setFromRotationMatrix(new THREE.Matrix4().fromArray(pose.transform.matrix));
+
+                scene.add(car);
+                modelPlaced = true;
+                reticle.visible = false; // Ховаємо reticle після розміщення
+              });
+            }
+          } else {
+            reticle.visible = false;
+          }
+        }
+      }
+
       renderer.render(scene, camera);
     }
 
-    init();
+    renderer.setAnimationLoop(render);
   </script>
 </body>
 </html>
