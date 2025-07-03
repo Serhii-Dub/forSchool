@@ -93,8 +93,8 @@ function onSelect() {
   // --- 1-а машина ---
   loader.load('car/car1.glb', (gltf1) => {
     const car1 = gltf1.scene;
-    car1.position.set(-0.3, 0, 0); // зліва
-    car1.scale.set(0.7, 0.7, 0.7);
+    car1.position.set(-0.22, 0, 0); // зліва, ближче
+    car1.scale.set(0.35, 0.35, 0.35); // зменшено у 2 рази
     group.add(car1);
   }, undefined, () => {
     alert('Не вдалося завантажити car1.glb');
@@ -103,8 +103,8 @@ function onSelect() {
   // --- 2-а машина ---
   loader.load('car/car2.glb', (gltf2) => {
     const car2 = gltf2.scene;
-    car2.position.set(0.3, 0, 0); // справа
-    car2.scale.set(0.7, 0.7, 0.7);
+    car2.position.set(0.22, 0, 0); // справа
+    car2.scale.set(0.35, 0.35, 0.35); // зменшено у 2 рази
     group.add(car2);
   }, undefined, () => {
     alert('Не вдалося завантажити car2.glb');
