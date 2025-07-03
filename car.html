@@ -7,6 +7,7 @@
         body { 
             margin: 0; 
             overflow: hidden; 
+            background-color: black; /* Додано для запобігання білому екрану */
         }
     </style>
 </head>
@@ -15,11 +16,11 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.136';
         import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
         import { ARButton } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/ARButton.js';
-        import { XRControllerModelFactory } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/webxr/XRControllerModelFactory.js';
 
-        // Ініціалізація сцени
+        // 1. Ініціалізація сцени
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        camera.position.set(0, 1.6, 0); // Висота очей людини
         
         const renderer = new THREE.WebGLRenderer({ 
             antialias: true, 
@@ -27,84 +28,92 @@
         });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
+        renderer.xr.enabled = true; // Увімкнути XR
         document.body.appendChild(renderer.domElement);
         
-        // Додавання кнопки AR з підтримкою hit-test
-        document.body.appendChild(ARButton.createButton(renderer, { 
+        // 2. Додавання кнопки AR
+        const arButton = ARButton.createButton(renderer, { 
             requiredFeatures: ['hit-test'] 
-        }));
+        });
+        document.body.appendChild(arButton);
 
-        // Освітлення
+        // 3. Освітлення (обов'язкове для моделей)
         const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(1, 1, 1);
+        light.position.set(0, 1, 0);
         scene.add(light);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        // Завантаження моделі
-        const loader = new GLTFLoader();
+        // 4. Завантаження моделі
         let model;
-
-        loader.load(
+        new GLTFLoader().load(
             'https://serhii-dub.github.io/forSchool/car/car2.glb',
             (gltf) => {
                 model = gltf.scene;
                 model.scale.set(0.5, 0.5, 0.5);
-                model.visible = false; // Початково приховати модель
+                model.visible = false;
                 scene.add(model);
             },
             undefined,
-            (error) => console.error(error)
+            (error) => console.error('Помилка завантаження моделі:', error)
         );
 
-        // Налаштування контролеру
-        const controller = renderer.xr.getController(0);
-        controller.addEventListener('select', onSelect);
-        scene.add(controller);
-
-        // Додавання ретейнера для решітки
+        // 5. Ретелк (індикатор поверхні)
         const reticle = new THREE.Mesh(
             new THREE.RingGeometry(0.05, 0.1, 32).rotateX(-Math.PI / 2),
-            new THREE.MeshBasicMaterial()
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
-        reticle.matrixAutoUpdate = false;
         reticle.visible = false;
+        reticle.matrixAutoUpdate = false;
         scene.add(reticle);
 
-        // Обробка початку сесії
-        renderer.xr.addEventListener('sessionstart', (event) => {
-            event.session.requestReferenceSpace('viewer').then((refSpace) => {
-                // Запит на виявлення поверхонь
-                event.session.requestHitTestSource({ space: refSpace }).then((hitTestSource) => {
-                    let hitTestSourceRef = hitTestSource;
-                    
-                    renderer.setAnimationLoop((timestamp, frame) => {
-                        if (frame && hitTestSourceRef) {
-                            const hitTestResults = frame.getHitTestResults(hitTestSourceRef);
-                            if (hitTestResults.length > 0) {
-                                const hit = hitTestResults[0];
-                                reticle.visible = true;
-                                reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
-                            } else {
-                                reticle.visible = false;
-                            }
-                        }
-                        renderer.render(scene, camera);
-                    });
-                });
-            });
-        });
+        // 6. Ініціалізація WebXR
+        let hitTestSource = null;
+        let refSpace = null;
 
-        // Обробка вибору місця розміщення
-        function onSelect() {
-            if (reticle.visible && model) {
-                model.position.setFromMatrixPosition(reticle.matrix);
-                model.visible = true;
-                model.quaternion.setFromRotationMatrix(reticle.matrix);
-            }
+        function onSessionStart(session) {
+            session.addEventListener('end', onSessionEnd);
+            
+            session.requestReferenceSpace('viewer').then((space) => {
+                refSpace = space;
+                return session.requestHitTestSource({ space: refSpace });
+            }).then((source) => {
+                hitTestSource = source;
+            });
         }
 
-        // Обробка зміни розміру вікна
+        function onSessionEnd() {
+            hitTestSource = null;
+            refSpace = null;
+        }
+
+        renderer.xr.addEventListener('sessionstart', (event) => onSessionStart(event.session));
+
+        // 7. Головний цикл рендерингу
+        renderer.setAnimationLoop((timestamp, frame) => {
+            if (frame && hitTestSource && refSpace) {
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                reticle.visible = hitTestResults.length > 0;
+                
+                if (reticle.visible) {
+                    const hit = hitTestResults[0];
+                    reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
+                }
+            }
+            renderer.render(scene, camera);
+        });
+
+        // 8. Розміщення моделі при кліку
+        const controller = renderer.xr.getController(0);
+        controller.addEventListener('select', () => {
+            if (reticle.visible && model) {
+                model.position.setFromMatrixPosition(reticle.matrix);
+                model.quaternion.setFromRotationMatrix(reticle.matrix);
+                model.visible = true;
+            }
+        });
+        scene.add(controller);
+
+        // 9. Обробка розміру вікна
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
