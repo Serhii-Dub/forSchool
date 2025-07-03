@@ -53,10 +53,8 @@
       loader.load('car/car2.glb',
         function (gltf) {
           carModel = gltf.scene;
-          // Дефолтний масштаб
-          carModel.scale.set(0.5, 0.5, 0.5);
-          // Початкова позиція — не має значення, все одно зміниться, але для надійності
-          carModel.position.set(0, 0.2, -0.5);
+          carModel.scale.set(2, 2, 2); // МЕГАВЕЛИКИЙ РОЗМІР
+          carModel.position.set(0, 1, -2); // ВИСОКО й ДАЛЕКО
           carModel.visible = false;
           scene.add(carModel);
         },
@@ -116,7 +114,7 @@
 
           carModel.position.set(
             pose.transform.position.x,
-            pose.transform.position.y + 0.2, // 20 см над підлогою
+            pose.transform.position.y + 1, // ВИСОКО над підлогою
             pose.transform.position.z
           );
           carModel.quaternion.set(
