@@ -49,6 +49,7 @@ renderer.xr.addEventListener('sessionstart', () => {
         // Зчитати початкову трансформацію
         model.position.setFromMatrixPosition(xrCam.matrixWorld);
         model.quaternion.setFromRotationMatrix(xrCam.matrixWorld);
+        model.scale.set(1.02, 1.02, 1.02);
         scene.add(model);
       }
     );
