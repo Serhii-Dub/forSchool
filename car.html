@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>AR Car Showroom</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background: #222;}
+    #info {
+      position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
+      color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
+      text-shadow: 0 1px 8px #000c;
+      font-size: 1.14em;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <b>AR Car Showroom</b><br>
+    Обійди авто з різних сторін у AR!<br>
+    (3D-моделі: car1, car2, car3)
+  </div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
+
+    let camera, scene, renderer;
+    let cars = [];
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+      // Світло
+      const light1 = new THREE.HemisphereLight(0xffffff, 0x444444, 1.3);
+      light1.position.set(0, 2, 0); scene.add(light1);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+      dirLight.position.set(2, 4, 2); scene.add(dirLight);
+
+      // Завантаження моделей авто з папки /car
+      const loader = new GLTFLoader();
+
+      // Всі машини — на одній лінії, трохи розсунуті
+      const carsInfo = [
+        {file: 'car/car1.glb', pos: [-0.7, 0, -1.2], scale: 1},
+        {file: 'car/car2.glb', pos: [ 0.0, 0, -1.2], scale: 1},
+        {file: 'car/car3.glb', pos: [ 0.7, 0, -1.2], scale: 1},
+      ];
+
+      for (let info of carsInfo) {
+        loader.load(info.file, gltf => {
+          let model = gltf.scene;
+          // Центруємо модель по Y, щоб "стояла на підлозі"
+          let box = new THREE.Box3().setFromObject(model);
+          let center = box.getCenter(new THREE.Vector3());
+          model.position.set(info.pos[0], info.pos[1] - center.y, info.pos[2]);
+          model.scale.setScalar(info.scale);
+
+          scene.add(model);
+          cars.push(model);
+        });
+      }
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
