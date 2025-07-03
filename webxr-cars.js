@@ -3,8 +3,6 @@ import { ARButton } from 'ARButton';
 import { GLTFLoader } from 'GLTFLoader';
 
 let scene, camera, renderer;
-let reticle, controller;
-let modelPlaced = false;
 
 init();
 animate();
@@ -23,78 +21,35 @@ function init() {
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
 
-  // Reticle
-  reticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.1, 0.13, 32).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x5fff5f, side: THREE.DoubleSide })
-  );
-  reticle.matrixAutoUpdate = false;
-  reticle.visible = false;
-  scene.add(reticle);
-
-  controller = renderer.xr.getController(0);
-  controller.addEventListener('select', onSelect);
-  scene.add(controller);
+  // Додаємо машини одразу при старті AR
+  renderer.xr.addEventListener('sessionstart', placeCars);
 
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 }
 
-let hitTestSource = null;
-let hitTestSourceRequested = false;
-
 function animate() {
-  renderer.setAnimationLoop(render);
+  renderer.setAnimationLoop(() => {
+    renderer.render(scene, camera);
+  });
 }
 
-function render(timestamp, frame) {
-  if (frame) {
-    const referenceSpace = renderer.xr.getReferenceSpace();
-    const session = renderer.xr.getSession();
-
-    if (!hitTestSourceRequested) {
-      session.requestReferenceSpace('viewer').then((refSpace) => {
-        session.requestHitTestSource({ space: refSpace }).then((source) => {
-          hitTestSource = source;
-        });
-      });
-      session.addEventListener('end', () => {
-        hitTestSourceRequested = false;
-        hitTestSource = null;
-      });
-      hitTestSourceRequested = true;
-    }
-
-    if (hitTestSource) {
-      const hitTestResults = frame.getHitTestResults(hitTestSource);
-      if (hitTestResults.length > 0) {
-        const hit = hitTestResults[0];
-        reticle.visible = true;
-        reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-      } else {
-        reticle.visible = false;
-      }
-    }
-  }
-  renderer.render(scene, camera);
-}
-
-// --- Tap на екран — розміщення двох GLB-моделей ---
-function onSelect() {
-  if (modelPlaced || !reticle.visible) return;
-  modelPlaced = true;
-
+function placeCars() {
+  // Група для двох машин
   const group = new THREE.Group();
   const loader = new GLTFLoader();
+
+  // Позиція на 1 метр вперед від старту (Z від'ємний у камері THREE.js)
+  group.position.set(0, 0, -1);
 
   // --- 1-а машина ---
   loader.load('car/car1.glb', (gltf1) => {
     const car1 = gltf1.scene;
-    car1.position.set(-0.22, 0, 0); // зліва, ближче
-    car1.scale.set(0.35, 0.35, 0.35); // зменшено у 2 рази
+    car1.position.set(-0.22, 0, 0); // зліва
+    car1.scale.set(0.35, 0.35, 0.35);
     group.add(car1);
   }, undefined, () => {
     alert('Не вдалося завантажити car1.glb');
@@ -104,14 +59,11 @@ function onSelect() {
   loader.load('car/car2.glb', (gltf2) => {
     const car2 = gltf2.scene;
     car2.position.set(0.22, 0, 0); // справа
-    car2.scale.set(0.35, 0.35, 0.35); // зменшено у 2 рази
+    car2.scale.set(0.35, 0.35, 0.35);
     group.add(car2);
   }, undefined, () => {
     alert('Не вдалося завантажити car2.glb');
   });
 
-  // Додаємо групу (обидві машини) у позицію reticle
-  group.position.setFromMatrixPosition(reticle.matrix);
-  group.quaternion.setFromRotationMatrix(reticle.matrix);
   scene.add(group);
 }
