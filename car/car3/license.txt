@@ -1,8 +1,11 @@
 Model Information:
-* title:	BMW M4 CSL
-* source:	https://sketchfab.com/3d-models/bmw-m4-csl-43b6158879c1490aafacd8b480147eb9
-* author:	RPMRender (https://sketchfab.com/RPMRender)
+* title:	arena standoff 2
+* source:	https://sketchfab.com/3d-models/arena-standoff-2-96f730c204994ce185a681c2af1d2c40
+* author:	frostychaos144 (https://sketchfab.com/frostychaos144)
 
 Model License:
-* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
-* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "arena standoff 2" (https://sketchfab.com/3d-models/arena-standoff-2-96f730c204994ce185a681c2af1d2c40) by frostychaos144 (https://sketchfab.com/frostychaos144) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
