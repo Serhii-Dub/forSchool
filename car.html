@@ -6,7 +6,7 @@
   <style>body { margin:0; overflow:hidden; }</style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/webxr/ARButton.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/webxr/ARButton.min.js"></script>
 </head>
 <body>
 <script>
@@ -23,13 +23,10 @@
 
   document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-  // Змінна для розміщення моделі тільки після першого "тапу"
   let reticle, controller, carModelLoaded = false;
 
-  // Завантажувач моделі
   const loader = new THREE.GLTFLoader();
 
-  // Додаємо невидимий "ретікл" (мітку позиції)
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
@@ -37,11 +34,9 @@
   reticle.visible = false;
   scene.add(reticle);
 
-  // Відстеження положення пристрою (hit-test)
   let hitTestSource = null;
   let hitTestSourceRequested = false;
 
-  // Додаємо контролер для "тапу"
   controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
@@ -56,7 +51,6 @@
     }
   }
 
-  // Основний цикл рендеру
   renderer.setAnimationLoop(function (timestamp, frame) {
     if (frame) {
       const referenceSpace = renderer.xr.getReferenceSpace();
