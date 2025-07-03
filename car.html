@@ -18,24 +18,18 @@
   <button id="ar-button">Увімкнути AR</button>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/webxr/ARButton.js"></script>
   <script>
     let camera, scene, renderer, controller, reticle, carModel;
-    let selectedCar = 'car/car1.glb'; // або 'car/car2.glb'
+    let selectedCar = 'car/car1.glb';
 
-    // Селектор моделі (можна кнопки, або просто змінюй шлях)
-    // selectedCar = 'car/car2.glb'; // щоб змінити модель
-
-    // Кнопка запуску AR
     const arButton = document.getElementById('ar-button');
-
     arButton.addEventListener('click', () => {
       arButton.style.display = 'none';
       startAR();
     });
 
     function startAR() {
-      // Renderer з підтримкою WebXR
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
@@ -45,11 +39,9 @@
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera();
 
-      // Світло
       const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
       scene.add(light);
 
-      // Reticle — покажчик площини
       reticle = new THREE.Mesh(
         new THREE.RingGeometry(0.11, 0.15, 32).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0x44ff44, opacity: 0.6, transparent: true })
@@ -58,19 +50,16 @@
       reticle.visible = false;
       scene.add(reticle);
 
-      // Завантажуємо модель, але додаємо лише після tap
       const loader = new THREE.GLTFLoader();
       loader.load(selectedCar, gltf => {
         carModel = gltf.scene;
-        carModel.visible = false; // Додаємо пізніше
-        carModel.scale.set(0.4, 0.4, 0.4); // змінюй під свій glb
+        carModel.visible = false;
+        carModel.scale.set(0.4, 0.4, 0.4);
         scene.add(carModel);
       });
 
-      // AR Button (WebXR)
       document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-      // AR Session
       let hitTestSource = null;
       let hitTestSourceRequested = false;
 
@@ -106,7 +95,6 @@
         renderer.render(scene, camera);
       });
 
-      // Tap to place car
       renderer.domElement.addEventListener('click', (event) => {
         if (reticle.visible && carModel && !carModel.visible) {
           carModel.position.setFromMatrixPosition(reticle.matrix);
