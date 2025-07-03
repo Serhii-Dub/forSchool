@@ -2,31 +2,31 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>AR Cars (WebXR)</title>
+  <title>AR Car Test</title>
   <style>
     html,body{margin:0;padding:0;overflow:hidden;background:#111;}
     #info {
       position: absolute; top: 10px; left: 0; right: 0; z-index: 10;
       color: #fff; font-family: Segoe UI,Arial,sans-serif; text-align: center;
       text-shadow: 0 1px 8px #000c;
-      font-size: 1.10em;
+      font-size: 1.11em;
       pointer-events: none;
     }
   </style>
 </head>
 <body>
   <div id="info">
-    <b>AR Cars WebXR</b><br>
-    Натисни <b>Enter AR</b>, розмісти авто та обходь їх з усіх боків!
+    <b>AR Car Test</b><br>
+    Якщо не бачиш кнопку — ПЕРЕВІР КОНСОЛЬ (завжди JS-помилка!)<br>
+    (імпорти такі ж як у робота)
   </div>
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
     import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
+    import { ARButton } from 'https://unpkg.com/three@0.161.0/examples/jsm/webxr/ARButton.js';
 
     let camera, scene, renderer;
-    let controller, reticle, hitTestSource = null, hitTestSourceRequested = false;
-    let modelsLoaded = false;
+    let car;
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera();
@@ -37,100 +37,27 @@
     renderer.xr.enabled = true;
     document.body.appendChild(renderer.domElement);
 
+    // ARButton — якщо дійшло до сюди, кнопка буде!
     document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
     // Світло
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.3));
     scene.add(new THREE.DirectionalLight(0xffffff, 0.4));
 
-    // Ретикл (для розміщення моделей на поверхні)
-    reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.12, 0.15, 32).rotateX(-Math.PI/2),
-      new THREE.MeshBasicMaterial({ color: 0x1ec8e7, transparent:true, opacity:0.7 })
-    );
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
-
-    // Контролер для взаємодії
-    controller = renderer.xr.getController(0);
-    scene.add(controller);
-
-    // Натискання по екрану — розмістити моделі
-    controller.addEventListener('select', placeCars);
-
-    let placed = false;
-    let cars3D = [];
-
-    function placeCars() {
-      if (!reticle.visible || placed || modelsLoaded === false) return;
-      placed = true;
-      // Розташування трьох машин поряд
-      const offsets = [-0.8, 0, 0.8];
-      for (let i = 0; i < cars3D.length; i++) {
-        let car = cars3D[i].clone();
-        car.position.set(offsets[i], 0, 0);
-        car.applyMatrix4(reticle.matrix);
-        scene.add(car);
-      }
-      reticle.visible = false;
-    }
-
-    // Завантаження GLB моделей
+    // Спробуй просто одну машину — наприклад, car/car1.glb
     const loader = new GLTFLoader();
-    let toLoad = 3, loaded = 0;
-    const carFiles = ['car/car1.glb','car/car2.glb','car/car3.glb'];
-    for (let i=0;i<carFiles.length;i++) {
-      loader.load(carFiles[i], gltf=>{
-        let model = gltf.scene;
-        // Центрувати по Y
-        let box = new THREE.Box3().setFromObject(model);
-        let center = box.getCenter(new THREE.Vector3());
-        model.position.y -= center.y; // "ноги" на землю
-        model.scale.setScalar(1.0); // підлаштуй якщо треба!
-        cars3D[i] = model;
-        loaded++;
-        if (loaded === toLoad) modelsLoaded = true;
-      }, undefined, err=>{
-        alert('Помилка завантаження ' + carFiles[i]);
-      });
-    }
-
-    renderer.setAnimationLoop((timestamp, frame) => {
-      if (renderer.xr.isPresenting) {
-        // HitTest для поверхні
-        const session = renderer.xr.getSession();
-        if (hitTestSourceRequested === false) {
-          session.requestReferenceSpace('viewer').then(refSpace => {
-            session.requestHitTestSource({ space: refSpace }).then(source => {
-              hitTestSource = source;
-            });
-          });
-          session.addEventListener('end', () => {
-            hitTestSourceRequested = false;
-            hitTestSource = null;
-            placed = false;
-          });
-          hitTestSourceRequested = true;
-        }
-        if (hitTestSource && frame) {
-          const refSpace = renderer.xr.getReferenceSpace();
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-          if (hitTestResults.length) {
-            const hit = hitTestResults[0];
-            reticle.visible = !placed && modelsLoaded;
-            reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
-          } else {
-            reticle.visible = false;
-          }
-        }
-      }
-      renderer.render(scene, camera);
+    loader.load('car/car1.glb', gltf=>{
+      car = gltf.scene;
+      let box = new THREE.Box3().setFromObject(car);
+      let center = box.getCenter(new THREE.Vector3());
+      car.position.set(0, -center.y, -1.2); // “стояла” на підлозі, перед камерою
+      car.scale.setScalar(1);
+      scene.add(car);
+    }, undefined, err=>{
+      alert('Помилка завантаження car/car1.glb');
     });
 
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    renderer.setAnimationLoop(()=>renderer.render(scene, camera));
   </script>
 </body>
 </html>
