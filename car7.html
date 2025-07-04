@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Безмаркерна AR - Car1</title>
+  <style>
+    html, body { margin:0; padding:0; background:#111; width:100vw; height:100vh; }
+    body { overflow:hidden; }
+    canvas { display:block; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// Three.js basics
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera();
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// AR Button
+document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: [] }));
+
+// Ставимо модель у початкову позицію камери при вході в AR
+let model = null;
+
+renderer.xr.addEventListener('sessionstart', () => {
+  if (!model) {
+    const loader = new GLTFLoader();
+    loader.load(
+      'car/car7/scene.gltf',
+      (gltf) => {
+        model = gltf.scene;
+        // Тепер треба дістати позицію й орієнтацію стартової камери XR
+        const xrCam = renderer.xr.getCamera(camera);
+        // Зчитати початкову трансформацію
+        model.position.setFromMatrixPosition(xrCam.matrixWorld);
+        model.quaternion.setFromRotationMatrix(xrCam.matrixWorld);
+        model.scale.set(15.0, 15.0, 15.0);
+        scene.add(model);
+      }
+    );
+  }
+});
+
+// Освітлення, щоб модель виглядала нормально
+{
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.1);
+  scene.add(light);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(5, 10, 7);
+  scene.add(dirLight);
+}
+
+renderer.setAnimationLoop(() => {
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
